@@ -1,0 +1,32 @@
+name: User Story
+description: A backlog item describing value for a user or component
+title: "[Story] "
+labels: ["user-story"]
+body:
+  - type: textarea
+    id: story
+    attributes:
+      label: User story
+      description: Who needs what, and why?
+      placeholder: As a <role>, I need <capability> so that <benefit>.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Testable conditions that must all be true for this story to be Done.
+      placeholder: |
+        - [ ] Given ..., when ..., then ...
+        - [ ] Unit tests cover the above and pass in CI
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / links
+      description: Design notes, related issues, docs, diagrams.
+  - type: markdown
+    attributes:
+      value: |
+        **After creating:** set Priority, Estimate, and Sprint on the project board, and break the story into sub-issues (tasks).
