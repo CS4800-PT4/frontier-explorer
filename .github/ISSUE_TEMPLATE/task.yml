@@ -1,0 +1,24 @@
+name: Task
+description: A technical sub-task, usually a sub-issue of a user story
+title: "[Task] "
+labels: ["task"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What needs to be done
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      placeholder: |
+        - [ ] ...
+    validations:
+      required: true
+  - type: input
+    id: parent
+    attributes:
+      label: Parent story
+      description: Issue number of the story this belongs to (e.g. #2). Also add it as a sub-issue there.
