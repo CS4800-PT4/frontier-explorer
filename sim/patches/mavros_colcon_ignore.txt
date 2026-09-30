@@ -1,0 +1,4 @@
+/home/aaron/mavros_ws/src/mavros/mavros_examples/COLCON_IGNORE
+/home/aaron/mavros_ws/src/mavros/mavros_msgs/COLCON_IGNORE
+/home/aaron/mavros_ws/src/mavros/test_mavros/COLCON_IGNORE
+/home/aaron/mavros_ws/src/mavros/tools/COLCON_IGNORE

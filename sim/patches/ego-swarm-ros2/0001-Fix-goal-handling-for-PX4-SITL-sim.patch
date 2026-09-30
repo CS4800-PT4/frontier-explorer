@@ -1,0 +1,67 @@
+From aea15a09710369bbf0f9b58d8d866d76be267776 Mon Sep 17 00:00:00 2001
+From: Aaron <aaronsebox@gmail.com>
+Date: Tue, 29 Sep 2026 22:38:53 -0700
+Subject: [PATCH] Fix goal handling for PX4 SITL sim
+
+- single_uav_gazebo.launch.py: map_size_x/y 10 -> 40 m. Out-of-map cells count
+  as obstacles, so goals beyond +/-5 m were rejected and the drone got stuck.
+- ego_replan_fsm.cpp: planNextWaypoint() called spin_some(node_) inside the
+  /goal_pose callback when the FSM was busy, which throws 'Node has already been
+  added to an executor' in ROS 2 and killed the planner. Switch state directly.
+- utils/px4_msgs: COLCON_IGNORE. Bundled px4_msgs is older than PX4 1.18
+  (VehicleStatus/VehicleCommand differ) and shadowed the matching one.
+---
+ .../launch/single_uav_gazebo.launch.py            |  4 ++--
+ planner/ego_planner/src/ego_replan_fsm.cpp        | 15 +++++----------
+ utils/px4_msgs/COLCON_IGNORE                      |  0
+ 3 files changed, 7 insertions(+), 12 deletions(-)
+ create mode 100644 utils/px4_msgs/COLCON_IGNORE
+
+diff --git a/planner/ego_planner/launch/single_uav_gazebo.launch.py b/planner/ego_planner/launch/single_uav_gazebo.launch.py
+index 935a0df..20f4ead 100755
+--- a/planner/ego_planner/launch/single_uav_gazebo.launch.py
++++ b/planner/ego_planner/launch/single_uav_gazebo.launch.py
+@@ -13,8 +13,8 @@ from launch.actions import LogInfo
+ 
+ def generate_launch_description():
+     # LaunchConfiguration definitions
+-    map_size_x = LaunchConfiguration('map_size_x', default=10.0)
+-    map_size_y = LaunchConfiguration('map_size_y', default=10.0)
++    map_size_x = LaunchConfiguration('map_size_x', default=40.0)
++    map_size_y = LaunchConfiguration('map_size_y', default=40.0)
+     map_size_z = LaunchConfiguration('map_size_z', default=4.0)
+     init_x = LaunchConfiguration('init_x', default=0.0)
+     init_y = LaunchConfiguration('init_y', default=0.0)
+diff --git a/planner/ego_planner/src/ego_replan_fsm.cpp b/planner/ego_planner/src/ego_replan_fsm.cpp
+index 8ed1fdf..5edef24 100755
+--- a/planner/ego_planner/src/ego_replan_fsm.cpp
++++ b/planner/ego_planner/src/ego_replan_fsm.cpp
+@@ -215,17 +215,12 @@ namespace ego_planner
+             have_new_target_ = true;
+ 
+             /*** FSM状态转换 ***/
+-            if (exec_state_ == WAIT_TARGET)
+-                changeFSMExecState(GEN_NEW_TRAJ, "TRIG");
+-            else
+-            {
+-                while (exec_state_ != EXEC_TRAJ)
+-                {
+-                    spin_some(node_);
+-                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+-                }
++            // ROS 2: can't spin_some() inside a callback of a node that is already spinning
++            // (throws "already been added to an executor"), so switch state directly.
++            if (exec_state_ == EXEC_TRAJ)
+                 changeFSMExecState(REPLAN_TRAJ, "TRIG");
+-            }
++            else
++                changeFSMExecState(GEN_NEW_TRAJ, "TRIG");
+ 
+             visualization_->displayGlobalPathList(gloabl_traj, 0.1, 0);
+         }
+diff --git a/utils/px4_msgs/COLCON_IGNORE b/utils/px4_msgs/COLCON_IGNORE
+new file mode 100644
+index 0000000..e69de29
+-- 
+2.34.1
+
