@@ -1,0 +1,42 @@
+From 2068b78474e4c1b2cf78a2fea5fe8a2b7a06f3e3 Mon Sep 17 00:00:00 2001
+From: Aaron <aaronsebox@gmail.com>
+Date: Tue, 29 Sep 2026 22:38:53 -0700
+Subject: [PATCH] Default to ego world; optional headless Gazebo
+
+- simulation-gazebo: --world default 'default' -> 'ego' (README step 1.2).
+- px4_sitl_ros2.launch.py: pass --headless to simulation-gazebo when
+  GZ_HEADLESS=1, for automated tests without a display.
+---
+ px4_sitl_ros2.launch.py | 2 +-
+ simulation-gazebo       | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/px4_sitl_ros2.launch.py b/px4_sitl_ros2.launch.py
+index 8ab0cbe..d07c7d4 100644
+--- a/px4_sitl_ros2.launch.py
++++ b/px4_sitl_ros2.launch.py
+@@ -76,7 +76,7 @@ def generate_launch_description():
+         cmd=[
+             'python3',
+             home_dir+'/ros_proj/gazebo_start/simulation-gazebo',
+-        ],
++        ] + (['--headless'] if os.environ.get('GZ_HEADLESS') == '1' else []),
+         output='screen'
+     )
+ 
+diff --git a/simulation-gazebo b/simulation-gazebo
+index e1f8954..95be44d 100644
+--- a/simulation-gazebo
++++ b/simulation-gazebo
+@@ -15,7 +15,7 @@ def run(cmd):
+ def main():
+     parser = argparse.ArgumentParser(description='Gazebo simulation')
+ 
+-    parser.add_argument('--world', help='World to run in Gazebo', required=False, default="default")
++    parser.add_argument('--world', help='World to run in Gazebo', required=False, default="ego")
+     parser.add_argument('--gz_partition', help='Gazebo partition to run in', required=False)
+     parser.add_argument('--gz_ip', help='Outgoing network interface to use for traffic',required=False)
+     parser.add_argument('--interactive',help='Run in interactive mode', required=False, default=False, action='store_true')
+-- 
+2.34.1
+

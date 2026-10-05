@@ -1,0 +1,41 @@
+From 588bcf49e07f0a12d1c2bdf708591ee97d1d743a Mon Sep 17 00:00:00 2001
+From: Aaron <aaronsebox@gmail.com>
+Date: Tue, 29 Sep 2026 22:38:53 -0700
+Subject: [PATCH] Subscribe to vehicle_status_v4 for PX4 >= 1.17
+
+PX4 1.18 publishes /fmu/out/vehicle_status_v4. The bridge only listened to
+vehicle_status and vehicle_status_v1, so it never saw OFFBOARD nav_state and
+never forwarded EGO trajectories.
+---
+ .gitignore                                         | 1 +
+ src/px4_ego_py/px4_ego_py/offboard_control_test.py | 6 ++++++
+ 2 files changed, 7 insertions(+)
+ create mode 100644 .gitignore
+
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..c18dd8d
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1 @@
++__pycache__/
+diff --git a/src/px4_ego_py/px4_ego_py/offboard_control_test.py b/src/px4_ego_py/px4_ego_py/offboard_control_test.py
+index 02bc4f3..1e0f02a 100644
+--- a/src/px4_ego_py/px4_ego_py/offboard_control_test.py
++++ b/src/px4_ego_py/px4_ego_py/offboard_control_test.py
+@@ -72,6 +72,12 @@ class OffboardControl(Node):
+             'fmu/out/vehicle_status_v1',
+             self.vehicle_status_callback,
+             qos_profile_sub)
++        # PX4 >= 1.17 publishes VehicleStatus MESSAGE_VERSION 4
++        self.status_sub_v4 = self.create_subscription(
++            VehicleStatus,
++            'fmu/out/vehicle_status_v4',
++            self.vehicle_status_callback,
++            qos_profile_sub)
+         self.vehicle_local_position_sub = self.create_subscription(
+             VehicleLocalPosition, '/fmu/out/vehicle_local_position_v1', self.vehicle_local_position_callback, qos_profile_sub)
+         self.vehicle_visual_odom_sub = self.create_subscription(
+-- 
+2.34.1
+
