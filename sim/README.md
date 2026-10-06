@@ -33,6 +33,7 @@ Run every command in your **Ubuntu (WSL) terminal**, from the repo root (`~/fron
    ```bash
    echo "export ROS_LOCALHOST_ONLY=0" >> ~/.bashrc
    echo "export RMW_IMPLEMENTATION=rmw_fastrtps_cpp" >> ~/.bashrc
+   source ~/.bashrc
    ```
 
 ## Step 1 — Install packages (needs sudo, ~5 min)
