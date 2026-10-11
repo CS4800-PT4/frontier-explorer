@@ -6,7 +6,7 @@ This documentation is to provide guidance on creating and interacting with a ROS
 ###  Step 1:
 Create a new python file under src/frontier-explorer/frontier_explorer.
 
-###  Step 2 :
+###  Step 2:
 Write code in the python file to create a ROS2 Node. Use the template from template_node.py as a starting point.
 
 ### Step 3:
@@ -33,9 +33,10 @@ source ~/.bashrc
 ```
 
 ### Step 5:
-Run the build command to include the changes to the build.
+Run the build command from the root of the repository to include the changes to the build.
 
 ```bash
+# Must run this command from the root of the repository
 colcon build
 ```
 
