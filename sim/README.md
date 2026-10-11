@@ -29,6 +29,13 @@ Run every command in your **Ubuntu (WSL) terminal**, from the repo root (`~/fron
    sudo make install && sudo ldconfig
    ```
 
+5. **bashrc file**: If your ROS_LOCAL_HOST and RMW_IMPLEMENTATION are not set in bashrc yet, run these commands. If they are already set but have different values, change them to the values shown below.
+   ```bash
+   echo "export ROS_LOCALHOST_ONLY=0" >> ~/.bashrc
+   echo "export RMW_IMPLEMENTATION=rmw_fastrtps_cpp" >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
 ## Step 1 — Install packages (needs sudo, ~5 min)
 ```bash
 sudo bash sim/1_sudo_install.sh
