@@ -45,7 +45,9 @@ sudo bash sim/1_sudo_install.sh
 ```bash
 bash sim/2_user_setup.sh
 ```
-This builds MAVROS, clones the three planner/sim repos, applies our fixes (`sim/patches/`), and builds them.
+This builds MAVROS, clones the three planner/sim repos, applies our fixes (`sim/patches/`), installs the warehouse world, and builds everything.
+
+**Already set up before?** Run `git pull` and then this step again. It only applies the new fixes and rebuilds.
 
 ## Step 3 — Check it works (~3 min, no windows open)
 ```bash
@@ -67,6 +69,19 @@ In a **second** Ubuntu terminal:
 bash sim/demo_stop.sh        # if it hangs: bash sim/kill_all.sh
 ```
 
+## Step 6 — Warehouse world
+Test it (~5 min, no windows open):
+```bash
+bash sim/warehouse_test.sh
+```
+Pass = `[warehouse] PASS (4/4 goals)`.
+
+Fly it yourself:
+```bash
+GZ_WORLD=default_warehouse bash sim/demo.sh
+```
+Same as Step 4, in a warehouse. The drone starts in open floor; the shelves and crates are ahead of it. Stop with Step 5.
+
 ---
 
 ## Rules
@@ -80,6 +95,8 @@ bash sim/demo_stop.sh        # if it hangs: bash sim/kill_all.sh
 | Gazebo/RViz windows don't appear | Run from your own Ubuntu terminal; try `wsl --shutdown` and reopen |
 | Drone never takes off | Check `~/.ego_sim/demo_logs/C_px4.log` for `Arming denied` |
 | Drone ignores clicks | `ros2 topic hz /mavros/local_position/odom` should show ~30 Hz |
+| Slow PC or VM: planner log shows `odom or depth lost` | Start with `EGO_DEPTH_TIMEOUT=3.0` in front of the command, e.g. `EGO_DEPTH_TIMEOUT=3.0 bash sim/demo.sh` |
+| Warehouse: `Timed out waiting for Gazebo world` | Re-run `bash sim/2_user_setup.sh` (installs the world and the launch fix) |
 | Build errors | Re-run `bash sim/2_user_setup.sh` (safe to repeat) |
 
 Logs: `~/.ego_sim/`. Full details, what we fixed and why: [`REFERENCE.md`](REFERENCE.md).

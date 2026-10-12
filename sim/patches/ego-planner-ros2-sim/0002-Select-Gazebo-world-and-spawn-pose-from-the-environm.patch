@@ -1,0 +1,60 @@
+From 15ad5f19a5fcce8a1bf41a2f34bbc64f50371032 Mon Sep 17 00:00:00 2001
+From: Aaron <aaronsebox@gmail.com>
+Date: Mon, 12 Oct 2026 13:42:26 -0700
+Subject: [PATCH] Select Gazebo world and spawn pose from the environment
+
+px4_sitl_ros2.launch.py:
+- GZ_WORLD picks ~/.simulation-gazebo/worlds/<GZ_WORLD>.sdf (default: ego).
+- PX4_GZ_WORLD is set to the <world name> inside that file. PX4's x500
+  airframe otherwise assumes "default" and times out waiting for any other
+  world.
+- SPAWN_POSE overrides the drone spawn point (default: -6,0).
+---
+ px4_sitl_ros2.launch.py | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/px4_sitl_ros2.launch.py b/px4_sitl_ros2.launch.py
+index d07c7d4..8f0e678 100644
+--- a/px4_sitl_ros2.launch.py
++++ b/px4_sitl_ros2.launch.py
+@@ -6,6 +6,19 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
+ from ament_index_python.packages import get_package_share_directory
+ 
+ import os
++import re
++
++# Gazebo world file to load (~/.simulation-gazebo/worlds/<GZ_WORLD>.sdf) and the
++# <world name> inside it, which PX4 needs (its x500 airframe otherwise assumes "default")
++GZ_WORLD = os.environ.get('GZ_WORLD', 'ego')
++
++def world_name(world_file):
++    path = os.path.expanduser(f'~/.simulation-gazebo/worlds/{world_file}.sdf')
++    try:
++        m = re.search(r"<world\s+name\s*=\s*['\"]([^'\"]+)", open(path).read())
++        return m.group(1) if m else 'default'
++    except OSError:
++        return 'default'
+ 
+ def generate_launch_description():
+ 
+@@ -39,7 +52,8 @@ def generate_launch_description():
+         additional_env={
+             'PX4_GZ_STANDALONE': '1',
+             'PX4_SYS_AUTOSTART': '4001',
+-            'PX4_GZ_MODEL_POSE': '-6,0',
++            'PX4_GZ_MODEL_POSE': os.environ.get('SPAWN_POSE', '-6,0'),
++            'PX4_GZ_WORLD': world_name(GZ_WORLD),
+             'PX4_SIM_MODEL': 'gz_x500_depth'
+         },
+         output='screen'
+@@ -76,6 +90,7 @@ def generate_launch_description():
+         cmd=[
+             'python3',
+             home_dir+'/ros_proj/gazebo_start/simulation-gazebo',
++            '--world', GZ_WORLD,
+         ] + (['--headless'] if os.environ.get('GZ_HEADLESS') == '1' else []),
+         output='screen'
+     )
+-- 
+2.34.1
+

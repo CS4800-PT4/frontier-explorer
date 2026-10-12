@@ -1,0 +1,64 @@
+From dc90c37b26c2b31358337ceefc11dee27c691752 Mon Sep 17 00:00:00 2001
+From: Aaron <aaronsebox@gmail.com>
+Date: Mon, 12 Oct 2026 14:00:59 -0700
+Subject: [PATCH] Resume planning after a short depth/odom stall
+
+A single gap longer than odom_depth_timeout (1 s) stopped the planner for
+the rest of the run: the map's timeout flag was never cleared, and the FSM
+also turned off fail-safe, so EMERGENCY_STOP could never exit. On slow
+machines and VMs this looked like "the drone ignores goal clicks".
+
+- grid_map.cpp: clear the timeout flag when fresh depth + odom arrive.
+- ego_replan_fsm.cpp: don't disable fail-safe on depth loss; leave
+  EMERGENCY_STOP only once depth is back and the drone has stopped.
+Tested by freezing the depth stream for 2.5 s mid-flight: the planner
+stops, then resumes and reaches the goal.
+---
+ planner/ego_planner/src/ego_replan_fsm.cpp | 6 ++++--
+ planner/plan_env/src/library/grid_map.cpp  | 3 +++
+ 2 files changed, 7 insertions(+), 2 deletions(-)
+ mode change 100755 => 100644 planner/ego_planner/src/ego_replan_fsm.cpp
+
+diff --git a/planner/ego_planner/src/ego_replan_fsm.cpp b/planner/ego_planner/src/ego_replan_fsm.cpp
+old mode 100755
+new mode 100644
+index 5edef24..9520692
+--- a/planner/ego_planner/src/ego_replan_fsm.cpp
++++ b/planner/ego_planner/src/ego_replan_fsm.cpp
+@@ -625,7 +625,8 @@ namespace ego_planner
+                 }
+                 else
+                 {
+-                    if (enable_fail_safe_ && odom_vel_.norm() < 0.1)
++                    if (enable_fail_safe_ && odom_vel_.norm() < 0.1 &&
++                        !planner_manager_->grid_map_->getOdomDepthTimeout())
+                         changeFSMExecState(GEN_NEW_TRAJ, "FSM");
+                 }
+ 
+@@ -716,7 +717,8 @@ namespace ego_planner
+         {
+             RCLCPP_ERROR(node_->get_logger(), "Depth Lost! EMERGENCY_STOP");
+ 
+-            enable_fail_safe_ = false;
++            // Stay stopped only while depth/odom is missing (EMERGENCY_STOP checks the flag);
++            // disabling fail-safe here made a single short stall stop the planner for good
+             changeFSMExecState(EMERGENCY_STOP, "SAFETY");
+         }
+ 
+diff --git a/planner/plan_env/src/library/grid_map.cpp b/planner/plan_env/src/library/grid_map.cpp
+index 80c18c0..bdf1f9c 100755
+--- a/planner/plan_env/src/library/grid_map.cpp
++++ b/planner/plan_env/src/library/grid_map.cpp
+@@ -720,6 +720,9 @@ void GridMap::updateOccupancyCallback()
+         return;
+     }
+     md_.last_occ_update_time_ = node_->now();
++    // Fresh depth + odom arrived: clear the timeout so one short stall doesn't
++    // leave the planner in EMERGENCY_STOP for the rest of the run
++    md_.flag_depth_odom_timeout_ = false;
+ 
+     /* update occupancy */
+     // ros::Time t1, t2, t3, t4;
+-- 
+2.34.1
+

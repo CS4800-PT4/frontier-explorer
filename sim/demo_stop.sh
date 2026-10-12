@@ -21,7 +21,7 @@ pkill -f "[d]emo.sh"
 pkill -9 -f "[g]z sim"; pkill -f "[r]viz2"
 pkill -f "[p]x4_sitl_ros2.launch"; pkill -f "[s]ingle_uav_gazebo.launch"; pkill -f "[r]viz.launch"
 pkill -f "[o]ffboard_control_test"; pkill -f "[m]avros_node"; pkill -f "[M]icroXRCEAgent"; pkill -f "[b]in/px4 "
-pkill -f "[e]go_planner_node"; pkill -f "[t]raj_server"; pkill -f "[d]epth_gz_bridge"; pkill -f "[s]tatic_transform_publisher"
+pkill -f "[e]go_planner_node"; pkill -f "[t]raj_server"; pkill -f "[d]epth_gz_bridge"; pkill -f "[p]arameter_bridge"; pkill -f "[s]tatic_transform_publisher"
 pkill -f "[r]os2 topic echo /goal_pose"
 sleep 3
 pgrep -af "[g]z sim|[m]avros_node|[b]in/px4 |[r]viz2|[e]go_planner_node" || echo "all stopped"

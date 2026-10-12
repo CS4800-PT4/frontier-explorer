@@ -7,6 +7,11 @@ source ~/mavros_ws/install/setup.bash
 source ~/ros2_ws/install/setup.bash
 source ~/ego_ws/install/setup.bash
 source ~/px4_ego_ws/install/setup.bash
+# Warehouse: shelves have open levels the planner would fly through or over. Keep it in a
+# 0.3-1.6 m band with 0.4 m obstacle padding (stock settings crashed into the shelves).
+if [ "$GZ_WORLD" = default_warehouse ]; then
+  export EGO_INFLATION=${EGO_INFLATION:-0.4} EGO_GROUND=${EGO_GROUND:-0.3} EGO_CEIL=${EGO_CEIL:-1.6}
+fi
 export GZ_HEADLESS=1   # no Gazebo GUI: test runs anywhere, even without a display
 L=~/.ego_sim/e2e_logs; mkdir -p $L
 Q="--qos-reliability best_effort"
@@ -45,7 +50,7 @@ cleanup() {
   pkill -9 -f "[g]z sim"
   pkill -f "[p]x4_sitl_ros2.launch"; pkill -f "[s]ingle_uav_gazebo.launch"; pkill -f "[o]ffboard_control_test"
   pkill -f "[g]z sim"; pkill -f "[m]avros_node"; pkill -f "[M]icroXRCEAgent"; pkill -f "[b]in/px4 "
-  pkill -f "[e]go_planner_node"; pkill -f "[t]raj_server"; pkill -f "[d]epth_gz_bridge"; pkill -f "[s]tatic_transform_publisher"
+  pkill -f "[e]go_planner_node"; pkill -f "[t]raj_server"; pkill -f "[d]epth_gz_bridge"; pkill -f "[p]arameter_bridge"; pkill -f "[s]tatic_transform_publisher"
 }
 trap cleanup EXIT
 
