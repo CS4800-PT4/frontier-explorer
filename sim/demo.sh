@@ -9,6 +9,11 @@ source ~/mavros_ws/install/setup.bash
 source ~/ros2_ws/install/setup.bash
 source ~/ego_ws/install/setup.bash
 source ~/px4_ego_ws/install/setup.bash
+# Warehouse: shelves have open levels the planner would fly through or over. Keep it in a
+# 0.3-1.6 m band with 0.4 m obstacle padding (stock settings crashed into the shelves).
+if [ "$GZ_WORLD" = default_warehouse ]; then
+  export EGO_INFLATION=${EGO_INFLATION:-0.4} EGO_GROUND=${EGO_GROUND:-0.3} EGO_CEIL=${EGO_CEIL:-1.6}
+fi
 L=~/.ego_sim/demo_logs; mkdir -p $L
 DLL_FILE=~/.ego_sim/nav_dll_act_orig
 pos() { timeout 5 ros2 topic echo /mavros/local_position/odom --once --field pose.pose.position 2>/dev/null | awk '{printf "%s %.2f  ", $1, $2}'; echo; }

@@ -10,14 +10,20 @@ source /opt/ros/humble/setup.bash
 
 clone() { [ -d "${@: -1}/.git" ] || git clone "$@"; }   # last arg = target dir
 
-# Put a repo on branch 'sim-fixes' with our patches applied (skips if already done)
+# Put a repo on branch 'sim-fixes' and apply any of our patches it doesn't have yet
+# (matched by commit subject, so re-running after a pull picks up new patches)
 apply_patches() {  # repo_dir patch_subdir
+  local p subject
   cd "$1"
   if git rev-parse --verify -q sim-fixes >/dev/null; then git checkout -q sim-fixes
-  else
-    git checkout -q -b sim-fixes
-    git -c user.name="${GIT_NAME:-sim-setup}" -c user.email="${GIT_EMAIL:-sim-setup@localhost}" am -q "$PATCHES/$2"/*.patch
+  else git checkout -q -b sim-fixes
   fi
+  for p in "$PATCHES/$2"/*.patch; do
+    subject=$(sed -n 's/^Subject: \[PATCH[^]]*\] //p' "$p")
+    # no grep -q: it exits early, git log gets SIGPIPE, and pipefail treats that as "not found"
+    git log --format=%s | grep -xF -- "$subject" >/dev/null && continue
+    git -c user.name="${GIT_NAME:-sim-setup}" -c user.email="${GIT_EMAIL:-sim-setup@localhost}" am -q "$p"
+  done
   cd - >/dev/null
 }
 
@@ -32,7 +38,7 @@ clone --depth 1 --branch 2.15.1 https://github.com/mavlink/mavros.git ~/mavros_w
 touch ~/mavros_ws/src/mavros/{mavros_msgs,test_mavros,mavros_examples}/COLCON_IGNORE
 ( cd ~/mavros_ws && MAKEFLAGS=-j6 colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF )
 
-# --- Sim repo (patched: ego world default, optional headless Gazebo) ---
+# --- Sim repo (patched: ego world default, optional headless Gazebo, world/spawn selection) ---
 clone https://github.com/DongnanHu6556/ego-planner-ros2-sim.git ~/ego-planner-ros2-sim
 apply_patches ~/ego-planner-ros2-sim ego-planner-ros2-sim
 mkdir -p ~/PX4-Autopilot/launch ~/ros_proj/gazebo_start
@@ -44,13 +50,15 @@ chmod +x ~/ros_proj/gazebo_start/simulation-gazebo ~/ros_proj/gazebo_start/depth
 ( cd ~/ros_proj/gazebo_start && python3 simulation-gazebo --world default --dryrun )
 mkdir -p ~/.simulation-gazebo/worlds
 cp ~/ego-planner-ros2-sim/ego.sdf ~/.simulation-gazebo/worlds/
+bash "$HERE/warehouse_setup.sh"   # warehouse world + its models
 
 # --- PX4 SITL binary (needed by the launch file) ---
 if [ ! -x ~/PX4-Autopilot/build/px4_sitl_default/bin/px4 ]; then
   ( cd ~/PX4-Autopilot && make px4_sitl_default )
 fi
 
-# --- EGO planner (patched: 40 m map, ROS 2 goal-callback crash fix, ignore stale px4_msgs) ---
+# --- EGO planner (patched: 40 m map, ROS 2 goal-callback crash fix, ignore stale px4_msgs,
+#     map safety settings from the environment) ---
 source ~/ros2_ws/install/setup.bash
 mkdir -p ~/ego_ws/src
 clone https://github.com/DongnanHu6556/ego-swarm-ros2.git ~/ego_ws/src/ego-swarm-ros2

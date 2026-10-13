@@ -130,6 +130,8 @@ Already present before this setup:
 | Copied | `simulation-gazebo`, `depth_gz_bridge.py` → `~/ros_proj/gazebo_start/` (chmod +x) |
 | Downloaded | Gazebo models/worlds → `~/.simulation-gazebo/` (via `simulation-gazebo --dryrun`) |
 | Copied | `ego.sdf` → `~/.simulation-gazebo/worlds/` |
+| Downloaded + edited | Fuel models `Depot` → `~/.simulation-gazebo/models/depot` (collisions added, static) and `Standing person` → `models/person` (static, local mesh path), by `sim/warehouse_setup.sh` |
+| Copied | `worlds/default_warehouse.sdf` → `~/.simulation-gazebo/worlds/` |
 
 ---
 
@@ -144,6 +146,11 @@ Already present before this setup:
 | 5 | Clicks beyond 5 m → drone stuck/jittering | `single_uav_gazebo.launch.py` set map 10 × 10 m; out-of-map cells count as obstacles (`getInflateOccupancy()` = −1) | `map_size_x/y` 10 → 40 | ego-swarm-ros2 |
 | 6 | Planner dies: `Node ... has already been added to an executor` | ROS 1→2 port: `planNextWaypoint()` calls `spin_some(node_)` inside the `/goal_pose` callback when a goal arrives while the FSM is busy | Switch FSM state directly (EXEC_TRAJ → REPLAN_TRAJ, else GEN_NEW_TRAJ) | ego-swarm-ros2 |
 | 7 | Takeoff key/goal sometimes lost; test Gazebo GUI segfaults from a background shell | `ros2 topic pub --once` can fire before discovery; Gazebo GUI crashes in software GL without a proper display | Scripts publish 3× and wait for real hover; `GZ_HEADLESS=1` option in launch file | ego-planner-ros2-sim + scripts |
+| 8 | Any world but `ego`: PX4 prints `Timed out waiting for Gazebo world` | PX4's x500 airframe defaults `PX4_GZ_WORLD=default` and waits for `/world/default/...`; `ego.sdf` only works because its world is named `default` | Launch file reads `GZ_WORLD`, loads that `.sdf`, and passes its `<world name>` to PX4 | ego-planner-ros2-sim |
+| 9 | Drone passes into warehouse shelves/crates | Fuel `Depot` model has no collisions except the floor | `warehouse_setup.sh` adds mesh collisions; model + people made static (otherwise real-time factor drops to ~0.4) | scripts |
+| 10 | Drone hits shelf posts, or flies under/over shelves and crashes | Shelves have open levels; EGO plans in 3D with 0.19 m padding, smaller than the x500 (~0.35–0.4 m to prop tip) | Warehouse defaults: `EGO_INFLATION=0.4`, `EGO_GROUND=0.3`, `EGO_CEIL=1.6` (env vars → launch params) | ego-swarm-ros2 + scripts |
+| 11 | Drone hovers and ignores all later goals after one hiccup (`Depth Lost! EMERGENCY_STOP` forever) | The map's depth/odom timeout flag was never cleared, and the FSM also turned off fail-safe, so EMERGENCY_STOP could never exit | Clear the flag on fresh data; leave EMERGENCY_STOP once depth is back and the drone has stopped. Slow VMs can also raise `EGO_DEPTH_TIMEOUT` | ego-swarm-ros2 |
+| 12 | Runs slow down over time; duplicate depth images | `demo_stop.sh`/`e2e_test.sh` never stopped the depth `parameter_bridge`, so one leaked per run | Kill it in cleanup | scripts |
 
 Other notes:
 - **The forwarded `flight_type` fix does not apply.** `single_uav_gazebo.launch.py` already uses `flight_type: 1`; planner and RViz both use `/goal_pose` — **don't** change it to `/move_base_simple/goal`.
@@ -174,12 +181,13 @@ cd ~/mavros_ws && MAKEFLAGS=-j6 colcon build --cmake-args -DCMAKE_BUILD_TYPE=Rel
 
 ## 8. How the patches work
 
-`sim/2_user_setup.sh` clones each upstream repo, creates a `sim-fixes` branch and applies `sim/patches/<repo>/*.patch` with `git am` (verified to apply cleanly to fresh clones). It's safe to re-run: repos already on `sim-fixes` are left alone.
+`sim/2_user_setup.sh` clones each upstream repo, creates a `sim-fixes` branch and applies `sim/patches/<repo>/*.patch` with `git am` (verified to apply cleanly to fresh clones). It's safe to re-run: a patch is skipped when a commit with the same subject is already on `sim-fixes`, so after a `git pull` re-running it applies only the new patches.
 
-To change a fix: edit the file in the cloned repo, `git commit --amend` on its `sim-fixes` branch, then re-export it into this repo:
+To add a fix: commit it on the cloned repo's `sim-fixes` branch, then export it with the next number:
 ```bash
-cd <cloned repo> && git format-patch -o ~/frontier-explorer/sim/patches/<repo> main..sim-fixes
+cd <cloned repo> && git format-patch -1 HEAD -o ~/frontier-explorer/sim/patches/<repo> --start-number <N>
 ```
+Keep the subject under ~60 characters (longer ones wrap in the patch header and won't match on re-runs).
 
 ---
 
@@ -196,8 +204,28 @@ cd <cloned repo> && git format-patch -o ~/frontier-explorer/sim/patches/<repo> m
 | `demo.sh` / `demo_stop.sh` | GUI demo; stop + restore arming setting |
 | `launch_all.sh` | opens tabs A–E in Windows Terminal (manual flow) |
 | `e2e_test.sh` | headless takeoff → offboard → goal(s) test |
+| `warehouse_setup.sh` | installs the warehouse world + its models (run by `2_user_setup.sh`) |
+| `warehouse_test.sh` | headless 4-goal obstacle course in the warehouse, prints PASS/FAIL |
 | `smoke.sh` | launches the sim only and checks topics |
 | `restart_planner.sh` | restart only the EGO planner (after param edits) |
 | `kill_all.sh` | force-stop everything |
 
-Logs (`demo_logs/`, `e2e_logs/`, `smoke.log`) and the saved arming setting go to `~/.ego_sim/`, outside the repo.
+Logs (`demo_logs/`, `e2e_logs/`, `warehouse_logs/`, `smoke.log`) and the saved arming setting go to `~/.ego_sim/`, outside the repo.
+
+---
+
+## 10. Warehouse world
+
+- **Select it:** `GZ_WORLD=default_warehouse` (any `<name>.sdf` in `~/.simulation-gazebo/worlds/` works). `SPAWN_POSE=x,y` moves the drone; the default (−6, 0) is open floor, 3.6 m from the nearest obstacle.
+- **Layout (Gazebo frame):** walls at x ±15.3, y ±7.7 m. Shelf rows around x 1–3, 5–7 and 9–10.5 (y 0–5), crates at x 0–12, y −1.6 to −6. Planner x = Gazebo x + 6.
+- **Planner settings** (env vars, read by `advanced_param.launch.py`; `demo.sh`, `e2e_test.sh` and `warehouse_test.sh` apply the warehouse values automatically):
+
+| Variable | Stock | Warehouse | Meaning |
+|---|---|---|---|
+| `EGO_INFLATION` | 0.19 | 0.4 | obstacle padding (m) |
+| `EGO_GROUND` | −0.01 | 0.3 | lowest altitude the planner may use (m) |
+| `EGO_CEIL` | 2.9 | 1.6 | highest altitude (m) |
+| `EGO_DEPTH_TIMEOUT` | 1.0 | 1.0 | seconds without depth/odom before an emergency stop; use 3.0 on slow VMs |
+
+- **Course results** (Oct 2026, headless, same 4 goals): stock settings crashed into shelving in both runs. Warehouse settings completed it.
+- **Still open:** the planner can still dip under a shelf's lowest level (closest pass 0.37 m). The real fix is a map that treats a whole column as blocked if anything occupies it at flight height (planned frontier mapper).
