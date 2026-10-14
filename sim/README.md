@@ -82,6 +82,21 @@ GZ_WORLD=default_warehouse bash sim/demo.sh
 ```
 Same as Step 4, in a warehouse. The drone starts in open floor; the shelves and crates are ahead of it. Stop with Step 5.
 
+## Step 7 — Frontier explorer
+Test it (~6 min, no windows open):
+```bash
+bash sim/frontier_test.sh
+```
+Pass = `[frontier] PASS`. It flies to 5 frontiers the explorer picks and prints how much of the map it has seen.
+
+Watch it:
+```bash
+bash sim/frontier_demo.sh      # warehouse + explorer_node + RViz with the explored map
+bash sim/frontier_go.sh 5      # second terminal, once it says READY: fly to 5 frontiers in a row
+```
+In RViz ("explored map"): light blue = seen and free, dark gray = obstacle, blank = not seen yet, orange = frontier cells, blue = frontier goals, green = the goal the explorer would pick next. You can still click 2D Goal Pose. Stop with Step 5.
+The same map is also on `/frontier/map` as an OccupancyGrid ("frontier map" display, off by default because its shader fails on some WSL graphics drivers).
+
 ---
 
 ## Rules
