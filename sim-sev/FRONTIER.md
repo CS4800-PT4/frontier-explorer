@@ -43,8 +43,8 @@ Subscribe:
 - /mavros/local_position/odom
 
 Publish:
-- /goal_pose, frame odom, z kept at the current hover height.
-  A z of 0 is the floor and the planner rejects it.
+- /goal_pose. The planner ignores frame_id and orientation and flies
+  every goal at z = 1.0 (it overwrites z). Only z below -0.1 is dropped.
 - visualization_msgs/MarkerArray for frontier clusters.
 
 Params:
@@ -78,8 +78,9 @@ One goal at a time. A stream of clicks is what made the path bounce.
   cv_bridge. pip3 install --user 'numpy<2' and restart C.
 - Goal published, drone still: D not in offboard. t, hover, o first.
   Echo /fmu/in/trajectory_setpoint. z of 0 is the old takeoff bug.
-- plan_success 0 and terminal point in obstacle: goal z is 0 or the
-  point is inside a pillar. Hold hover z and skip that cluster.
+- plan_success 0 and terminal point in obstacle: the point is inside
+  or next to a pillar (goal z does not matter, it is forced to 1.0).
+  Skip that cluster.
 - Red path rewrites and the vehicle never moves: goals are being
   published in a loop. One goal, then wait.
 - Drone under the grid: a goal or takeoff z went below the floor.
