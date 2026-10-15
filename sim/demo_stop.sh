@@ -25,5 +25,6 @@ pkill -f "[p]x4_sitl_ros2.launch"; pkill -f "[s]ingle_uav_gazebo.launch"; pkill 
 pkill -f "[o]ffboard_control_test"; pkill -f "[m]avros_node"; pkill -f "[M]icroXRCEAgent"; pkill -f "[b]in/px4 "
 pkill -f "[e]go_planner_node"; pkill -f "[t]raj_server"; pkill -f "[d]epth_gz_bridge"; pkill -f "[p]arameter_bridge"; pkill -f "[s]tatic_transform_publisher"
 pkill -f "[r]os2 topic echo /goal_pose"; pkill -f "[b]ash .*sim/frontier_go.sh"; pkill -f "[l]ib/frontier_explorer/explorer_node"; pkill -f "[r]un frontier_explorer explorer_node"
+pkill -f "[h]ardware.launch.py"; pkill -f "[f]ake_zed.py"; pkill -f "[l]ib/frontier_explorer/vision_relay"; pkill -f "[l]ib/frontier_explorer/extrinsic_node"
 sleep 3
 pgrep -af "[g]z sim|[m]avros_node|[b]in/px4 |[r]viz2|[e]go_planner_node" || echo "all stopped"

@@ -1,0 +1,15 @@
+# Overrides on top of the ZED wrapper's own config files (we don't edit those).
+# hardware.launch.py passes this as ros_params_override_path.
+# Parameter names are from the zed-ros2-wrapper 4.x docs. If the wrapper warns that one
+# doesn't exist, check the wrapper's config/common*.yaml for the new name.
+/**:
+  ros__parameters:
+    general:
+      # EGO handles depth images up to 640 x 480. VGA is 672 x 376; HD720 would crash it.
+      grab_resolution: 'VGA'
+      grab_frame_rate: 15
+    pos_tracking:
+      pos_tracking_enabled: true
+      # Area memory can jump the pose when it recognizes a place. PX4 handles a smooth
+      # drift better than a sudden jump, so it stays off.
+      area_memory: false

@@ -1,0 +1,30 @@
+From 0af5abbda2344936ba2363751795169dc8b0e597 Mon Sep 17 00:00:00 2001
+From: Aaron <aaronsebox@gmail.com>
+Date: Thu, 15 Oct 2026 00:59:03 -0700
+Subject: [PATCH] Also subscribe to vehicle_local_position for PX4 1.15
+
+Newer PX4 (the sim runs 1.18) publishes /fmu/out/vehicle_local_position_v1,
+but 1.15 (the flight controller on the drone) publishes it without the suffix.
+Without it the bridge never gets a position, so takeoff and offboard hover
+hold (0, 0, 0).
+---
+ src/px4_ego_py/px4_ego_py/offboard_control_test.py | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/px4_ego_py/px4_ego_py/offboard_control_test.py b/src/px4_ego_py/px4_ego_py/offboard_control_test.py
+index 1e0f02a..b9616d2 100644
+--- a/src/px4_ego_py/px4_ego_py/offboard_control_test.py
++++ b/src/px4_ego_py/px4_ego_py/offboard_control_test.py
+@@ -80,6 +80,9 @@ class OffboardControl(Node):
+             qos_profile_sub)
+         self.vehicle_local_position_sub = self.create_subscription(
+             VehicleLocalPosition, '/fmu/out/vehicle_local_position_v1', self.vehicle_local_position_callback, qos_profile_sub)
++        # PX4 1.15 (on the drone) publishes it without the _v1 suffix that newer PX4 adds
++        self.vehicle_local_position_sub_v0 = self.create_subscription(
++            VehicleLocalPosition, '/fmu/out/vehicle_local_position', self.vehicle_local_position_callback, qos_profile_sub)
+         self.vehicle_visual_odom_sub = self.create_subscription(
+             VehicleOdometry, '/fmu/in/vehicle_visual_odometry', self.vehicle_visual_odom_callback, qos_profile_sub)
+         self.planning_pos_cmd_sub = self.create_subscription(
+-- 
+2.34.1
+

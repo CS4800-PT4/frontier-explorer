@@ -8,7 +8,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 PATCHES=$HERE/patches
 source /opt/ros/humble/setup.bash
 
-clone() { [ -d "${@: -1}/.git" ] || git clone "$@"; }   # last arg = target dir
+clone() { local dir=${!#}; [ -d "$dir/.git" ] || git clone "$@"; }   # last arg = target dir
 
 # Put a repo on branch 'sim-fixes' and apply any of our patches it doesn't have yet
 # (matched by commit subject, so re-running after a pull picks up new patches)
@@ -65,7 +65,7 @@ clone https://github.com/DongnanHu6556/ego-swarm-ros2.git ~/ego_ws/src/ego-swarm
 apply_patches ~/ego_ws/src/ego-swarm-ros2 ego-swarm-ros2
 ( cd ~/ego_ws && colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release )
 
-# --- Offboard bridge (patched: vehicle_status_v4) ---
+# --- Offboard bridge (patched: vehicle_status_v4, PX4 1.15 local position topic) ---
 mkdir -p ~/px4_ego_ws/src
 clone https://github.com/DongnanHu6556/px4_ego.git ~/px4_ego_ws/src/px4_ego
 apply_patches ~/px4_ego_ws/src/px4_ego px4_ego

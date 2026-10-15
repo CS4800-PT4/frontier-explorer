@@ -97,6 +97,13 @@ bash sim/frontier_go.sh 5      # second terminal, once it says READY: fly to 5 f
 In RViz ("explored map"): light blue = seen and free, dark gray = obstacle, blank = not seen yet, orange = frontier cells, blue = frontier goals, green = the goal the explorer would pick next. You can still click 2D Goal Pose. Stop with Step 5.
 The same map is also on `/frontier/map` as an OccupancyGrid ("frontier map" display, off by default because its shader fails on some WSL graphics drivers).
 
+## Step 8 — Hardware launch check (R2)
+After pulling R2, re-run `bash sim/2_user_setup.sh` once (it adds a bridge fix for PX4 1.15). Then:
+```bash
+bash sim/hw_profile_test.sh
+```
+Pass = `[frontier] PASS` with `bench check: PASS`. This starts everything except Gazebo and PX4 from the drone launch file (`hardware.launch.py`), with `sim/fake_zed.py` publishing the sim camera under the ZED topic names, runs `hw/bench_check.sh`, then flies 5 frontier goals. Logs: `~/.ego_sim/hw_profile_logs`. Drone setup is in [`hw/README.md`](../hw/README.md).
+
 ---
 
 ## Rules

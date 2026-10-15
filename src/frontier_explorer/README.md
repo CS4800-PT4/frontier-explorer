@@ -48,6 +48,25 @@ bash sim/demo_stop.sh
 bash sim/frontier_test.sh
 ```
 
+## Hardware launch (R2)
+
+`launch/hardware.launch.py` starts the drone stack with one command: the ZED wrapper, MAVROS,
+the XRCE agent, EGO (with the ZED's intrinsics), the px4_ego bridge, `explorer_node` and the
+two nodes below. Setup and bring-up: [hw/README.md](../../hw/README.md).
+
+| File | Node | What it does |
+| --- | --- | --- |
+| `mount.py` | | Camera mount math. EGO moves depth points from the camera's optical frame onto the drone with a fixed cam2body transform; this builds it from the measured offset and tilt. |
+| `extrinsic_node.py` | extrinsic_node | Publishes that transform on `/vins_estimator/extrinsic` once a second, the only way to set EGO's camera mount without editing EGO. Params `cam_x`, `cam_y`, `cam_z` (m, forward/left/up), `cam_pitch_deg` (down). |
+| `vision_relay.py` | vision_relay | Forwards ZED odometry (`/zed/zed_node/odom`) to `/mavros/vision_pose/pose` so PX4 has a position indoors. Drops poses with NaNs and warns when the ZED stops sending. |
+
+```bash
+# On the drone
+ros2 launch frontier_explorer hardware.launch.py camera_model:=zed2i cam_x:=0.10 cam_z:=0.05
+# In the sim, with a fake ZED (prints PASS/FAIL)
+bash sim/hw_profile_test.sh
+```
+
 ## Node Documentation
 
 This documentation is to provide guidance on creating and interacting with a ROS2 node.
