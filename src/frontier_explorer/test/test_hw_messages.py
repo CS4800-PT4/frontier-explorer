@@ -10,7 +10,7 @@ from nav_msgs.msg import Odometry  # noqa: E402
 
 from frontier_explorer.extrinsic_node import extrinsic_msg  # noqa: E402
 from frontier_explorer.mount import cam2body, quaternion_to_rotation  # noqa: E402
-from frontier_explorer.vision_relay import pose_from_odom  # noqa: E402
+from frontier_explorer.vision_relay import pose_from_odom, tracking_ok  # noqa: E402
 
 
 def test_extrinsic_message_is_what_ego_reads():
@@ -36,13 +36,40 @@ def test_relay_keeps_pose_and_stamp():
     out = pose_from_odom(odom(), 'odom')
     assert out.header.stamp.sec == 42
     assert out.header.frame_id == 'odom'
-    assert (out.pose.position.x, out.pose.position.y, out.pose.position.z) == (1.0, 2.0, 0.5)
+    pos = out.pose.pose.position
+    assert (pos.x, pos.y, pos.z) == (1.0, 2.0, 0.5)
     s = math.sqrt(0.5)
     out = pose_from_odom(odom(w=s, qz=s), 'odom')
-    assert math.isclose(out.pose.orientation.z, s)
+    assert math.isclose(out.pose.pose.orientation.z, s)
+
+
+def test_relay_passes_the_zed_covariance_to_px4():
+    msg = odom()
+    msg.pose.covariance[0] = msg.pose.covariance[7] = 0.04
+    out = pose_from_odom(msg, 'odom')
+    assert out.pose.covariance[0] == 0.04 and out.pose.covariance[7] == 0.04
 
 
 def test_relay_drops_bad_poses():
     assert pose_from_odom(odom(x=float('nan')), 'odom') is None
     assert pose_from_odom(odom(w=0.0), 'odom') is None        # not a rotation
     assert pose_from_odom(odom(w=float('inf')), 'odom') is None
+    msg = odom()
+    msg.pose.covariance[0] = float('nan')
+    assert pose_from_odom(msg, 'odom') is None
+
+
+class Status:
+    def __init__(self, **fields):
+        self.__dict__.update(fields)
+
+
+def test_tracking_status():
+    # zed_msgs/PosTrackStatus: odometry_status 0 = OK, 1 = UNAVAILABLE, 2 = INSUFFICIENT_FEATURES
+    assert tracking_ok(Status(odometry_status=0, status=1))
+    assert not tracking_ok(Status(odometry_status=1, status=1))
+    assert not tracking_ok(Status(odometry_status=2, status=1))
+    # older wrappers only have the deprecated status field, where 1 = OK
+    assert tracking_ok(Status(status=1))
+    assert not tracking_ok(Status(status=0))
+    assert not tracking_ok(Status(status=5))

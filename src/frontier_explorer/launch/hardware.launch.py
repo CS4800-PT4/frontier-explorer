@@ -9,12 +9,14 @@ Nothing from the sim runs here (no Gazebo, no PX4 SITL). Each piece can be turne
 The camera intrinsics come from ~/.ego_hw/zed_intrinsics.yaml, written by
 hw/zed_intrinsics.sh, unless fx/fy/cx/cy are given here.
 """
+import math
 import os
 
 import yaml
 from ament_index_python.packages import PackageNotFoundError, get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, OpaqueFunction
+from launch.actions import (DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription,
+                            LogInfo, OpaqueFunction)
 from launch.launch_description_sources import (AnyLaunchDescriptionSource,
                                                PythonLaunchDescriptionSource)
 from launch_ros.actions import Node
@@ -42,6 +44,8 @@ ARGS = {
     'zed_override': ('', 'ZED params file (default: config/zed_override.yaml in this package)'),
     'depth_topic': ('/zed/zed_node/depth/depth_registered', 'Depth image EGO maps from'),
     'zed_odom': ('/zed/zed_node/odom', 'ZED odometry forwarded to PX4'),
+    'zed_status': ('/zed/zed_node/pose/status', 'ZED tracking status; poses are held back '
+                   'while it is not OK (empty = do not check)'),
     'intrinsics_file': ('~/.ego_hw/zed_intrinsics.yaml', 'Written by hw/zed_intrinsics.sh'),
     'fx': ('', 'Depth camera fx (overrides intrinsics_file)'),
     'fy': ('', 'Depth camera fy'),
@@ -50,7 +54,8 @@ ARGS = {
     'cam_x': ('0.0', 'Camera position from the flight controller, forward (m)'),
     'cam_y': ('0.0', 'Camera position, left (m)'),
     'cam_z': ('0.0', 'Camera position, up (m)'),
-    'cam_pitch_deg': ('0.0', 'Camera tilt, positive = looking down (deg)'),
+    'cam_pitch_deg': ('0.0', 'Camera tilt, positive = looking down (deg). Only EGO uses it; '
+                      'the explorer and vision_relay assume a level camera'),
     # planner
     'odom_topic': ('/mavros/local_position/odom', 'Drone pose EGO and the explorer use'),
     'map_size_x': ('40.0', 'EGO and explorer map size (m)'),
@@ -73,16 +78,21 @@ def number(context, name):
         raise RuntimeError(f'{name}:={value!r} is not a number')
 
 
+def double(context, name):
+    """A number as EGO's launch wants it: '1' would reach EGO as an int and crash it."""
+    return str(number(context, name))
+
+
 def is_on(context, name):
     return context.launch_configurations[name].lower() in ('true', '1', 'yes')
 
 
 def intrinsics(context):
-    """fx, fy, cx, cy from the launch arguments, else from the intrinsics file."""
+    """fx, fy, cx, cy (and width when known) from the launch arguments, else the file."""
     cfg = context.launch_configurations
     given = {k: cfg[k] for k in ('fx', 'fy', 'cx', 'cy') if cfg[k]}
     if len(given) == 4:
-        return {k: float(v) for k, v in given.items()}
+        return {k: number(context, k) for k in given}
     if given:
         raise RuntimeError('give all of fx, fy, cx, cy or none of them')
     path = os.path.expanduser(cfg['intrinsics_file'])
@@ -98,7 +108,15 @@ def intrinsics(context):
     if w * h > EGO_MAX_PIXELS:
         raise RuntimeError(f'depth is {w}x{h}, EGO only handles up to 640x480 pixels '
                            f'(set the ZED to VGA and run hw/zed_intrinsics.sh again)')
-    return {k: float(data[k]) for k in ('fx', 'fy', 'cx', 'cy')}
+    cam = {k: float(data[k]) for k in ('fx', 'fy', 'cx', 'cy')}
+    if w:
+        cam['width'] = w
+    return cam
+
+
+def fov_deg(cam):
+    """Horizontal field of view of the depth image, for the explorer's sweep."""
+    return math.degrees(2.0 * math.atan(cam['width'] / 2.0 / cam['fx']))
 
 
 def share(package):
@@ -129,7 +147,8 @@ def build(context):
     if is_on(context, 'mavros'):
         mavros_share = share('mavros')
         if mavros_share is None:
-            raise RuntimeError('mavros is not installed: source ~/mavros_ws/install/setup.bash')
+            raise RuntimeError('mavros is not installed: run sudo bash hw/1_jetson_sudo.sh '
+                               '(the sim builds it in ~/mavros_ws)')
         launch_args = {'fcu_url': cfg['fcu_url']}
         if cfg['gcs_url']:
             launch_args['gcs_url'] = cfg['gcs_url']
@@ -141,10 +160,11 @@ def build(context):
         actions.append(ExecuteProcess(
             cmd=['MicroXRCEAgent'] + cfg['xrce_args'].split(), name='xrce_agent', output='screen'))
 
+    cam = intrinsics(context) if is_on(context, 'ego') else {}
+
     if is_on(context, 'ego'):
         if share('ego_planner') is None:
             raise RuntimeError('ego_planner is not installed: source ~/ego_ws/install/setup.bash')
-        cam = intrinsics(context)
         # advanced_param.launch.py reads these from the environment when it loads
         os.environ['EGO_INFLATION'] = str(number(context, 'inflation'))
         os.environ['EGO_GROUND'] = str(number(context, 'ground'))
@@ -153,12 +173,13 @@ def build(context):
         # Same as EGO's single_uav_gazebo.launch.py, plus the camera intrinsics
         ego_args = {
             'drone_id': '0',
-            'map_size_x_': cfg['map_size_x'], 'map_size_y_': cfg['map_size_y'],
-            'map_size_z_': cfg['map_size_z'],
+            'map_size_x_': double(context, 'map_size_x'),
+            'map_size_y_': double(context, 'map_size_y'),
+            'map_size_z_': double(context, 'map_size_z'),
             'odometry_topic': cfg['odom_topic'], 'depth_topic': cfg['depth_topic'],
             'cloud_topic': '/lidar_points',
             'fx': str(cam['fx']), 'fy': str(cam['fy']), 'cx': str(cam['cx']), 'cy': str(cam['cy']),
-            'max_vel': cfg['max_vel'], 'max_acc': cfg['max_acc'],
+            'max_vel': double(context, 'max_vel'), 'max_acc': double(context, 'max_acc'),
             'planning_horizon': '7.5', 'use_distinctive_trajs': 'True', 'flight_type': '1',
             'point_num': '1', 'point0_x': '0.0', 'point0_y': '0.0', 'point0_z': '1.0',
         }
@@ -191,17 +212,25 @@ def build(context):
                             output='screen', additional_env={'PYTHONUNBUFFERED': '1'}))
 
     if is_on(context, 'explorer'):
+        params = {'depth_topic': cfg['depth_topic'], 'odom_topic': cfg['odom_topic'],
+                  'map_size_x': number(context, 'map_size_x'),
+                  'map_size_y': number(context, 'map_size_y')}
+        if 'width' in cam:   # else the explorer keeps its default (the sim camera)
+            params['fov_deg'] = fov_deg(cam)
+        if number(context, 'cam_pitch_deg') != 0.0:
+            # The sweep marks a band at 0.7-1.3 m as seen across the whole field of view. A
+            # tilted camera may not see the top of that band far out, so it can be marked
+            # seen without being seen.
+            actions.append(LogInfo(msg='WARNING: cam_pitch_deg is not 0, but the explorer '
+                                       'assumes a level camera when it marks space as seen'))
         actions.append(Node(
             package='frontier_explorer', executable='explorer_node', output='screen',
-            additional_env={'PYTHONUNBUFFERED': '1'},
-            parameters=[{'depth_topic': cfg['depth_topic'], 'odom_topic': cfg['odom_topic'],
-                         'map_size_x': number(context, 'map_size_x'),
-                         'map_size_y': number(context, 'map_size_y')}]))
+            additional_env={'PYTHONUNBUFFERED': '1'}, parameters=[params]))
 
     if is_on(context, 'vision'):
         actions.append(Node(
             package='frontier_explorer', executable='vision_relay', output='screen',
-            parameters=[{'odom_in': cfg['zed_odom']}]))
+            parameters=[{'odom_in': cfg['zed_odom'], 'status_in': cfg['zed_status']}]))
 
     return actions
 

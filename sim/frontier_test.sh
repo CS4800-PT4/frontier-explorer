@@ -49,7 +49,7 @@ cleanup() {
   pkill -9 -f "[g]z sim"; pkill -f "[m]avros_node"; pkill -f "[M]icroXRCEAgent"; pkill -f "[b]in/px4 "
   pkill -f "[e]go_planner_node"; pkill -f "[t]raj_server"; pkill -f "[d]epth_gz_bridge"; pkill -f "[p]arameter_bridge"
   pkill -f "[s]tatic_transform_publisher"
-  pkill -f "[h]ardware.launch.py"; pkill -f "[f]ake_zed.py"
+  pkill -f "[r]os2 launch frontier_explorer hardware\.launch\.py"; pkill -f "[p]ython3 .*sim/fake_zed\.py"
   pkill -f "[l]ib/frontier_explorer/vision_relay"; pkill -f "[l]ib/frontier_explorer/extrinsic_node"
 }
 trap cleanup EXIT
@@ -119,7 +119,8 @@ if [ "$HW_PROFILE" = 1 ]; then
   python3 $REPO/sim/fake_zed.py > $L/F_fake_zed.log 2>&1 &
   bash $REPO/hw/zed_intrinsics.sh /zed/zed_node/depth/camera_info $L/zed_intrinsics.yaml | tee -a $L/F_fake_zed.log
   [ "${PIPESTATUS[0]}" = 0 ] || { echo "FAIL: hw/zed_intrinsics.sh could not read the fake ZED camera_info"; exit 1; }
-  # Everything else as on the drone
+  # Everything else as on the drone. EGO_* are unset so EGO only gets the launch's own values.
+  env -u EGO_INFLATION -u EGO_GROUND -u EGO_CEIL -u EGO_DEPTH_TIMEOUT \
   ros2 launch frontier_explorer hardware.launch.py zed:=false mavros:=false xrce:=false \
     intrinsics_file:=$L/zed_intrinsics.yaml max_vel:=0.8 max_acc:=1.0 \
     inflation:=$EGO_INFLATION ground:=$EGO_GROUND ceil:=$EGO_CEIL depth_timeout:=$EGO_DEPTH_TIMEOUT \
@@ -152,7 +153,7 @@ if [ "$HW_PROFILE" = 1 ]; then
   # The drone hovers in takeoff mode while this runs (the bridge keeps sending the hover point)
   echo "[frontier] bench check"
   ros2 topic list > $L/topics.txt 2>&1
-  MIN_DEPTH_HZ=5 bash $REPO/hw/bench_check.sh 2>&1 | tee $L/bench.log
+  SIM=1 MIN_DEPTH_HZ=5 bash $REPO/hw/bench_check.sh 2>&1 | tee $L/bench.log
   [ "${PIPESTATUS[0]}" = 0 ] && BENCH=PASS || BENCH=FAIL
 fi
 # The bridge only holds offboard for ~10 s without a planner command (PX4 then reports

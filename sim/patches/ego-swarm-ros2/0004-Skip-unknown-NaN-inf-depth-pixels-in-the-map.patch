@@ -1,0 +1,61 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Aaron <aaronsebox@gmail.com>
+Date: Thu, 15 Oct 2026 22:15:29 -0700
+Subject: [PATCH] Skip unknown (NaN, -inf) depth pixels in the map
+
+---
+ planner/plan_env/src/library/grid_map.cpp | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/planner/plan_env/src/library/grid_map.cpp b/planner/plan_env/src/library/grid_map.cpp
+index bdf1f9c..3c17fc6 100755
+--- a/planner/plan_env/src/library/grid_map.cpp
++++ b/planner/plan_env/src/library/grid_map.cpp
+@@ -1,7 +1,28 @@
++#include <algorithm>
++#include <cmath>
+ #include <utility>
+ 
+ #include "plan_env/grid_map.h"
+ 
++// Stereo cameras like the ZED mark unknown depth as NaN and too-close depth as -inf.
++// convertTo() turns both into 0, which projectDepthImage() reads as "nothing in range"
++// and clears the map along the whole ray, so a blank wall or a glass door can be erased.
++// Set them just under depth_filter_mindist so those pixels are skipped instead.
++// +inf (nothing within range) is left alone and still clears free space.
++static void skipUnknownDepth(cv::Mat& depth, double min_dist, double scale)
++{
++    const float skip = static_cast<float>(std::max(0.5 * min_dist, 1.0 / scale));
++    for (int v = 0; v < depth.rows; ++v)
++    {
++        float* p = depth.ptr<float>(v);
++        for (int u = 0; u < depth.cols; ++u)
++        {
++            if (std::isnan(p[u]) || p[u] <= 0.f)
++                p[u] = skip;
++        }
++    }
++}
++
+ // #define current_img_ md_.depth_image_[image_cnt_ & 1]
+ // #define last_img_ md_.depth_image_[!(image_cnt_ & 1)]
+ using namespace std;
+@@ -761,6 +782,7 @@ void GridMap::depthPoseCallback(const sensor_msgs::msg::Image::ConstPtr& img,
+ 
+     if (img->encoding == sensor_msgs::image_encodings::TYPE_32FC1)
+     {
++        skipUnknownDepth(cv_ptr->image, mp_.depth_filter_mindist_, mp_.k_depth_scaling_factor_);
+         (cv_ptr->image).convertTo(cv_ptr->image, CV_16UC1, mp_.k_depth_scaling_factor_);
+     }
+     cv_ptr->image.copyTo(md_.depth_image_);
+@@ -1062,6 +1084,7 @@ void GridMap::depthOdomCallback(const sensor_msgs::msg::Image::ConstPtr& img,
+     cv_ptr = cv_bridge::toCvCopy(img, img->encoding);
+     if (img->encoding == sensor_msgs::image_encodings::TYPE_32FC1)
+     {
++        skipUnknownDepth(cv_ptr->image, mp_.depth_filter_mindist_, mp_.k_depth_scaling_factor_);
+         (cv_ptr->image).convertTo(cv_ptr->image, CV_16UC1, mp_.k_depth_scaling_factor_);
+     }
+     cv_ptr->image.copyTo(md_.depth_image_);
+-- 
+2.34.1
+

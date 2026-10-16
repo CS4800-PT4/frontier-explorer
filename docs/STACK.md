@@ -21,7 +21,7 @@ change: Gazebo and PX4 SITL in the sim, the ZED and the real flight controller o
              |                                       v  (Micro XRCE-DDS agent)
    PX4 SITL (UDP)  <---------------------------- PX4 (serial on the drone)
         |                                            ^
-        | MAVLink (MAVROS)                           | /mavros/vision_pose/pose (drone only,
+        | MAVLink (MAVROS)                           | /mavros/vision_pose/pose_cov (drone only,
         v                                            |  vision_relay <- /zed/zed_node/odom)
    /mavros/local_position/odom ----> EGO, explorer_node, frontier scripts
 ```
@@ -30,7 +30,12 @@ change: Gazebo and PX4 SITL in the sim, the ZED and the real flight controller o
   The XRCE agent carries setpoints in and `/fmu/out/...` status out. EGO never talks to PX4.
 - EGO maps from a depth image plus odometry. It projects pixels with `fx, fy, cx, cy` and
   moves them onto the drone with its cam2body transform. On the drone the intrinsics come from
-  the ZED (`hw/zed_intrinsics.sh`) and the mount from `extrinsic_node`.
+  the ZED (`hw/zed_intrinsics.sh`) and the mount from `extrinsic_node`. Pixels with no depth
+  (NaN) or too close (-inf) are skipped (EGO patch 0004). Before that they turned into
+  free-space rays that could erase a blank wall from the map.
+- `vision_relay` only forwards the ZED pose while the ZED says it is tracking
+  (`/zed/zed_node/pose/status`). The ZED keeps publishing its last pose when tracking is lost,
+  and PX4 would otherwise keep using that frozen position.
 - The explorer only uses EGO's obstacle cloud, odometry and the depth topic's arrival time,
   so it doesn't care which camera feeds EGO.
 
@@ -53,3 +58,12 @@ change: Gazebo and PX4 SITL in the sim, the ZED and the real flight controller o
 `sim/hw_profile_test.sh` runs the drone column in the sim: the hardware launch with
 `zed:=false`, the sim links, and `sim/fake_zed.py` publishing the sim camera under the ZED
 topic names.
+
+What that test does not cover:
+- PX4 SITL still flies on simulated GPS. The vision pose reaches MAVROS but PX4 doesn't use it,
+  so the `EKF2_EV_*` settings, the height datum and the `EKF2_EV_POS` offset are only checked on
+  the drone (`hw/bench_check.sh` and its hand checks).
+- PX4 SITL is 1.18, so the bridge gets local position on the `_v1` topic. The 1.15 topic that
+  patch 0002 adds is only used on the drone.
+- `fake_zed.py` has no tracking status (no `zed_msgs` in the sim), so `vision_relay` forwards
+  every pose there.

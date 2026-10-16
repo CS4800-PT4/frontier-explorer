@@ -40,7 +40,7 @@ if fx <= 0 or fy <= 0:
 if info.width * info.height > 640 * 480:
     sys.exit(f'[intrinsics] depth is {info.width}x{info.height}; EGO only handles up to '
              f'640x480. Set the ZED to VGA (config/zed_override.yaml) and run this again.')
-os.makedirs(os.path.dirname(out), exist_ok=True)
+os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
 with open(out, 'w') as f:
     f.write(f'# From {topic} on {time.strftime("%Y-%m-%d %H:%M")}\n')
     f.write(f'width: {info.width}\nheight: {info.height}\n')

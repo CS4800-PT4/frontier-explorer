@@ -58,7 +58,7 @@ two nodes below. Setup and bring-up: [hw/README.md](../../hw/README.md).
 | --- | --- | --- |
 | `mount.py` | | Camera mount math. EGO moves depth points from the camera's optical frame onto the drone with a fixed cam2body transform; this builds it from the measured offset and tilt. |
 | `extrinsic_node.py` | extrinsic_node | Publishes that transform on `/vins_estimator/extrinsic` once a second, the only way to set EGO's camera mount without editing EGO. Params `cam_x`, `cam_y`, `cam_z` (m, forward/left/up), `cam_pitch_deg` (down). |
-| `vision_relay.py` | vision_relay | Forwards ZED odometry (`/zed/zed_node/odom`) to `/mavros/vision_pose/pose` so PX4 has a position indoors. Drops poses with NaNs and warns when the ZED stops sending. |
+| `vision_relay.py` | vision_relay | Forwards ZED odometry (`/zed/zed_node/odom`) with its covariance to `/mavros/vision_pose/pose_cov` so PX4 has a position indoors. Holds poses back while the ZED reports lost tracking (`/zed/zed_node/pose/status`), drops poses with NaNs, and warns when the ZED stops sending. |
 
 ```bash
 # On the drone
