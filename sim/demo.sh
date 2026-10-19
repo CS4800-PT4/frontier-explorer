@@ -16,6 +16,13 @@ if [ "$GZ_WORLD" = default_warehouse ]; then
 fi
 L=~/.ego_sim/demo_logs; mkdir -p $L
 DLL_FILE=~/.ego_sim/nav_dll_act_orig
+# FRONTIER=1 (set by frontier_demo.sh): also run the frontier explorer, with its own RViz view
+REPO=$(cd "$(dirname "$0")/.." && pwd)
+if [ "$FRONTIER" = 1 ]; then
+  ( cd $REPO && colcon build --symlink-install --packages-select frontier_explorer ) > $L/build.log 2>&1 \
+    || { echo "[demo] frontier_explorer build failed, see $L/build.log"; exit 1; }
+  source $REPO/install/setup.bash
+fi
 pos() { timeout 5 ros2 topic echo /mavros/local_position/odom --once --field pose.pose.position 2>/dev/null | awk '{printf "%s %.2f  ", $1, $2}'; echo; }
 # Send a mode key a few times: a single --once publish can be lost before discovery completes
 key() { timeout 4 ros2 topic pub -r 2 -t 3 /mode_key std_msgs/msg/String "{data: $1}" >/dev/null 2>&1; }
@@ -29,16 +36,38 @@ takeoff() {
   done
   echo "    TAKEOFF FAILED - check $L/C_px4.log for 'Arming denied'"; return 1
 }
+# Change a PX4 param for this run. The original is saved in $3 and put back by demo_stop.sh;
+# if the original can't be read, the param is left alone.
+sim_param() {  # name value file
+  local v i
+  if [ ! -s $3 ]; then
+    for i in 1 2 3 4 5; do
+      v=$(timeout 15 ros2 param get --no-daemon /mavros/param $1 2>/dev/null | sed -nE "s/^(Double|Integer) value is: (-?[0-9]+(\.[0-9]+)?)$/\2/p")
+      [ -n "$v" ] && break; sleep 2
+    done
+    [ -n "$v" ] || { echo "[demo] WARNING: could not read $1, leaving it as is"; return 1; }
+    echo "$v" > $3
+  fi
+  timeout 15 ros2 param set --no-daemon /mavros/param $1 $2 >/dev/null 2>&1
+}
 
 echo "[demo] starting PX4 + Gazebo + MAVROS"
 ros2 launch ~/PX4-Autopilot/launch/px4_sitl_ros2.launch.py > $L/C_px4.log 2>&1 &
 sleep 45
 [ -s $DLL_FILE ] || ros2 param get --no-daemon /mavros/param NAV_DLL_ACT 2>/dev/null | grep -oE "[0-9]+$" > $DLL_FILE
 ros2 param set --no-daemon /mavros/param NAV_DLL_ACT 0 >/dev/null 2>&1   # no QGC needed; demo_stop.sh restores it
+# WSL can stall ROS traffic for ~2 s (EGO logs "odom or depth lost"). PX4's sim default drops
+# offboard after 1 s without a setpoint and flies home, so allow 5 s. demo_stop.sh restores it.
+sim_param COM_OF_LOSS_T 5.0 ~/.ego_sim/com_of_loss_t_orig
 
 echo "[demo] starting EGO planner, RViz, offboard bridge"
 ros2 launch ego_planner single_uav_gazebo.launch.py > $L/B_ego.log 2>&1 &
-ros2 launch ego_planner rviz.launch.py > $L/A_rviz.log 2>&1 &
+if [ "$FRONTIER" = 1 ]; then
+  rviz2 -d $REPO/src/frontier_explorer/rviz/frontier.rviz > $L/A_rviz.log 2>&1 &
+  ros2 run frontier_explorer explorer_node > $L/E_explorer.log 2>&1 &
+else
+  ros2 launch ego_planner rviz.launch.py > $L/A_rviz.log 2>&1 &
+fi
 ros2 run px4_ego_py offboard_control_test > $L/D_bridge.log 2>&1 &
 sleep 10
 
@@ -48,6 +77,7 @@ echo "[demo] demo goal (4, 2)"
 timeout 4 ros2 topic pub -r 2 -t 3 /goal_pose geometry_msgs/msg/PoseStamped "{header: {frame_id: world}, pose: {position: {x: 4.0, y: 2.0, z: 0.0}, orientation: {w: 1.0}}}" >/dev/null 2>&1
 sleep 20; echo -n "[demo] pos after demo goal: "; pos
 echo "[demo] READY - click 2D Goal Pose in RViz"
+[ "$FRONTIER" = 1 ] && echo "[demo] or, in a second terminal: bash sim/frontier_go.sh 5   (fly to 5 frontiers in a row)"
 
 # Log every goal clicked in RViz and where the drone ends up
 ros2 topic echo /goal_pose geometry_msgs/msg/PoseStamped --field pose.position > $L/goals.log 2>&1 &
