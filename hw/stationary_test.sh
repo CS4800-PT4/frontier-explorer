@@ -31,6 +31,7 @@ fi
 source "$FE_WS/env.sh"
 LOG=$FE_WS/logs/$(date +%m%d_%H%M%S)
 mkdir -p "$LOG"
+exec > >(tee -a "$LOG/run.log") 2>&1   # a copy for hw/collect_info.sh
 
 say() { echo "[stationary] $*"; }
 PIDS=()

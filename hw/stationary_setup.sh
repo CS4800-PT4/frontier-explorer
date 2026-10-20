@@ -26,7 +26,9 @@ FE_WS=${FE_WS:-$HOME/fe_ws}
 EGO_URL=${EGO_URL:-https://github.com/DongnanHu6556/ego-swarm-ros2.git}
 EGO_BASE=fd808477dc1a7447d3bfc91a86a31665be089161   # same pin as hw/2_jetson_setup.sh
 ZED_WRAPPER_REF=${ZED_WRAPPER_REF:-master}
-mkdir -p "$FE_WS"
+mkdir -p "$FE_WS/logs"
+# Keep a copy of this run's output for hw/collect_info.sh
+exec > >(tee -a "$FE_WS/logs/setup_$(date +%m%d_%H%M%S).log") 2>&1
 
 say() { echo "[setup] $*"; }
 die() { echo "[setup] !!! $*"; exit 1; }

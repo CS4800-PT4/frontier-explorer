@@ -53,6 +53,19 @@ It changes a few settings because the camera starts on the ground (z = 0): EGO's
 -1 m (else EGO thinks the camera is inside the floor), and the explorer maps at any height,
 counting obstacles 0.2 to 1.0 m above the camera. The ZED's own odometry stands in for PX4's.
 
+## When something fails
+
+```bash
+bash hw/collect_info.sh        # while the test is still running, or right after it failed
+```
+
+It writes one text file to `~/fe_ws/reports/` with everything needed to debug it: the Jetson,
+JetPack, CUDA, the ZED SDK and whether the camera shows up on USB, the ROS packages it finds and
+their versions, our workspaces and git versions, serial ports, recent USB and out-of-memory
+errors from the kernel, the output of the last setup and test runs, the errors in each node's
+log, and (if the stack is up) the live nodes, topics and rates. It only reads, needs no sudo,
+and doesn't record IP addresses. Works for the full hardware launch too.
+
 ## 1. Install (once)
 
 1. Check the JetPack version: `cat /etc/nv_tegra_release`. JetPack 6 (L4T R36) is Ubuntu 22.04,
