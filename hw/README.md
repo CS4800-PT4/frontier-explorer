@@ -22,6 +22,37 @@ ros2 launch frontier_explorer hardware.launch.py camera_model:=zed2i
 | extrinsic_node | tells EGO where the camera sits on the drone | |
 | vision_relay | forwards ZED odometry to PX4 through MAVROS (indoor position) | |
 
+## Stationary test (on a Jetson someone else set up)
+
+Checks the explorer and EGO on the real ZED with the drone sitting still. No flight controller
+is needed: MAVROS, the XRCE agent, the bridge and the vision relay stay off, so nothing can arm.
+Use this instead of sections 1 to 4 on a Jetson that already has ROS 2 Humble and the ZED SDK
+and is used for other things. `stationary_setup.sh` doesn't change anything that is already
+there:
+- EGO and `frontier_explorer` build in their own folders (`~/fe_ws` and this repo), with only
+  ROS 2 sourced.
+- It uses the ZED wrapper already on the Jetson. Only if there is none, it builds its own copy
+  in `~/fe_ws/zed_ws`.
+- apt: it only installs packages that are missing, asks first, and stops if that would upgrade
+  or remove anything already installed. What it added is listed in `~/fe_ws/apt_added.txt`.
+- Nothing goes in `~/.bashrc`. Remove `~/fe_ws` to undo.
+
+```bash
+git clone https://github.com/CS4800-PT4/frontier-explorer.git ~/fe_ws/frontier-explorer
+cd ~/fe_ws/frontier-explorer && git checkout r2-hardware-zed
+bash hw/stationary_setup.sh                 # once; safe to re-run
+bash hw/stationary_test.sh zed2i            # your camera: zed, zedm, zed2 or zed2i
+```
+
+The test saves the camera intrinsics the first time, starts the ZED, EGO and the explorer
+(and RViz if there is a screen), checks each link, then prints the explorer's status every
+10 s. Walk the camera around slowly and watch the map and frontiers grow. Ctrl-C stops it.
+Logs are in `~/fe_ws/logs/`.
+
+It changes a few settings because the camera starts on the ground (z = 0): EGO's `ground` is
+-1 m (else EGO thinks the camera is inside the floor), and the explorer maps at any height,
+counting obstacles 0.2 to 1.0 m above the camera. The ZED's own odometry stands in for PX4's.
+
 ## 1. Install (once)
 
 1. Check the JetPack version: `cat /etc/nv_tegra_release`. JetPack 6 (L4T R36) is Ubuntu 22.04,
