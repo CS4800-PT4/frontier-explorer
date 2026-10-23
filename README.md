@@ -12,3 +12,7 @@ The ROS package is in [src/frontier_explorer](src/frontier_explorer/README.md). 
 ## Hardware
 
 The drone (Jetson Orin Nano, ZED, PX4 1.15) runs the same package from one launch file: [hw/README.md](hw/README.md). How the sim and drone stacks connect: [docs/STACK.md](docs/STACK.md). Test the drone launch in the sim first: `bash sim/hw_profile_test.sh`.
+
+## Submodules
+
+The repositories under `external/` are managed as Git submodules. See [docs/SUBMODULE_WORKFLOW.md](docs/SUBMODULE_WORKFLOW.md) for how to update a submodule and then record its new commit in `frontier-explorer`.
