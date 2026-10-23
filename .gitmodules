@@ -1,3 +1,6 @@
 [submodule "external/PX4-Autopilot"]
 	path = external/PX4-Autopilot
 	url = git@github.com:CS4800-PT4/PX4-Autopilot.git
+[submodule "external/ego-planner-ros2-sim"]
+	path = external/ego-planner-ros2-sim
+	url = git@github.com:CS4800-PT4/ego-planner-ros2-sim.git
