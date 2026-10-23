@@ -4,3 +4,18 @@
 [submodule "external/ego-planner-ros2-sim"]
 	path = external/ego-planner-ros2-sim
 	url = git@github.com:CS4800-PT4/ego-planner-ros2-sim.git
+[submodule "external/ego_ws/src/ego-swarm-ros2"]
+	path = external/ego_ws/src/ego-swarm-ros2
+	url = git@github.com:CS4800-PT4/ego-swarm-ros2.git
+[submodule "external/px4_ego/src/px4_ego"]
+	path = external/px4_ego/src/px4_ego
+	url = git@github.com:CS4800-PT4/px4_ego.git
+[submodule "external/mavros_ws/src/mavros"]
+	path = external/mavros_ws/src/mavros
+	url = git@github.com:CS4800-PT4/mavros.git
+[submodule "external/ros2_ws/src/px4_msgs"]
+	path = external/ros2_ws/src/px4_msgs
+	url = git@github.com:CS4800-PT4/px4_msgs.git
+[submodule "external/Micro-XRCE-DDS-Agent"]
+	path = external/Micro-XRCE-DDS-Agent
+	url = git@github.com:CS4800-PT4/Micro-XRCE-DDS-Agent.git
