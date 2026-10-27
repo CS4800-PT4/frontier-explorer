@@ -73,3 +73,12 @@ before B, A, and D.
 t, wait for hover, o, then one 2D Goal Pose in open space.
 Pass: /fmu/in/trajectory_setpoint z is about 0.9 more negative than local z,
 and QGC altitude climbs. A zero setpoint means the old node is still running.
+
+
+## Hardware (real drone) — sim-sev only
+
+- `hardware.launch.py` — Jetson/ZED/MAVROS launch (no Gazebo)
+- `config/zed_override.yaml` — ZED VGA / 15 Hz
+- `live-demo/` — class demo README + `run_demo.sh`
+
+Professor starts at `sim-sev/live-demo/README.md` (§0 = set your ports, then launch + helper).

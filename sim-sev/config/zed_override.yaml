@@ -1,0 +1,10 @@
+# Overrides for ZED wrapper (sim-sev copy). Passed by sim-sev/hardware.launch.py.
+# VGA + 15 Hz so EGO stays under its 640x480 depth limit. Position tracking on.
+/**:
+  ros__parameters:
+    general:
+      grab_resolution: 'VGA'
+      grab_frame_rate: 15
+    pos_tracking:
+      pos_tracking_enabled: true
+      area_memory: false
