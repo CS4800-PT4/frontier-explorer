@@ -54,7 +54,7 @@ ARGS = {
     'zed_odom': ('/zed/zed_node/odom', 'ZED odometry forwarded to PX4'),
     'zed_status': ('/zed/zed_node/pose/status', 'ZED tracking status; poses are held back '
                    'while it is not OK (empty = do not check)'),
-    'intrinsics_file': ('~/.ego_hw/zed_intrinsics.yaml', 'Written by hw/zed_intrinsics.sh'),
+    'intrinsics_file': ('~/.ego_hw/zed_intrinsics.yaml', 'Written by jetson-runner/05_capture_intrinsics.sh'),
     'fx': ('', 'Depth camera fx (overrides intrinsics_file)'),
     'fy': ('', 'Depth camera fy'),
     'cx': ('', 'Depth camera cx'),
@@ -105,17 +105,17 @@ def intrinsics(context):
         raise RuntimeError('give all of fx, fy, cx, cy or none of them')
     path = os.path.expanduser(cfg['intrinsics_file'])
     if not os.path.isfile(path):
-        raise RuntimeError(f'no camera intrinsics: run bash hw/zed_intrinsics.sh first '
+        raise RuntimeError(f'no camera intrinsics: run bash jetson-runner/05_capture_intrinsics.sh first '
                            f'(writes {path}) or pass fx:= fy:= cx:= cy:=')
     with open(path) as f:
         data = yaml.safe_load(f) or {}
     missing = [k for k in ('fx', 'fy', 'cx', 'cy') if k not in data]
     if missing:
-        raise RuntimeError(f'{path} is missing {missing}; run hw/zed_intrinsics.sh again')
+        raise RuntimeError(f'{path} is missing {missing}; run jetson-runner/05_capture_intrinsics.sh again')
     w, h = data.get('width', 0), data.get('height', 0)
     if w * h > EGO_MAX_PIXELS:
         raise RuntimeError(f'depth is {w}x{h}, EGO only handles up to 640x480 pixels '
-                           f'(set the ZED to VGA and run hw/zed_intrinsics.sh again)')
+                           f'(set the ZED to VGA and run jetson-runner/05_capture_intrinsics.sh again)')
     cam = {k: float(data[k]) for k in ('fx', 'fy', 'cx', 'cy')}
     if w:
         cam['width'] = w
@@ -156,7 +156,7 @@ def build(context):
             raise RuntimeError('set camera_model:= (zed, zedm, zed2 or zed2i)')
         zed_share = share('zed_wrapper')
         if zed_share is None:
-            raise RuntimeError('zed_wrapper is not installed: run hw/2_jetson_setup.sh and '
+            raise RuntimeError('zed_wrapper is not installed: run sim-sev/jetson-runner/02_build.sh and '
                                'source ~/zed_ws/install/setup.bash (or pass zed:=false)')
         override = zed_override_path(cfg)
         actions.append(IncludeLaunchDescription(
@@ -167,8 +167,7 @@ def build(context):
     if is_on(context, 'mavros'):
         mavros_share = share('mavros')
         if mavros_share is None:
-            raise RuntimeError('mavros is not installed: run sudo bash hw/1_jetson_sudo.sh '
-                               '(the sim builds it in ~/mavros_ws)')
+            raise RuntimeError('mavros is not installed: run sudo bash sim-sev/jetson-runner/01_sudo_install.sh')
         launch_args = {'fcu_url': cfg['fcu_url']}
         if cfg['gcs_url']:
             launch_args['gcs_url'] = cfg['gcs_url']
@@ -227,8 +226,7 @@ def build(context):
 
     if is_on(context, 'bridge'):
         if share('px4_ego_py') is None:
-            raise RuntimeError('px4_ego_py is not installed: source ~/px4_ego_ws/install/setup.bash '
-                               '(or ~/px4_ego/install/setup.bash)')
+            raise RuntimeError('px4_ego_py is not installed: run jetson-runner/02_build.sh (installs ~/px4_ego_ws)')
         actions.append(Node(package='px4_ego_py', executable='offboard_control_test',
                             output='screen', additional_env={'PYTHONUNBUFFERED': '1'}))
 

@@ -4,7 +4,8 @@
 # Ctrl+C at any prompt to stop this helper (use kill switch / l / d as needed).
 #
 # Keys (bridge listens on /mode_key):
-#   t = takeoff+arm   o = follow explorer goals
+#   t = takeoff+arm   o = offboard (MUST before Explorer)   then explorer
+# KNOWN ISSUE: Explorer before o crashes — see ../KNOWN_ISSUES.md
 #   p = hover HERE (freeze current x/y/z)   l = land HERE   d = disarm
 set -euo pipefail
 
@@ -58,22 +59,31 @@ if ! timeout 20 ros2 topic echo /mavros/local_position/odom --once >/dev/null 2>
 fi
 echo "[demo] odom OK"
 
-confirm "START / TAKEOFF (send t) — props spin, climbs ~2 m and holds"
+confirm "START / TAKEOFF (send t) — props spin, climbs to ~0.9 m (bridge default) and holds"
 pub_key t 8
 echo "[demo] waiting for hover. Press Enter when it is hovering stably."
 read -r _
 
-confirm "START EXPLORER (frontier_explorer explorer_node)"
+# KNOWN ISSUE: starting Explorer before offboard (o) crashes the program.
+# Always send o first, then start explorer_node. See sim-sev/KNOWN_ISSUES.md.
+confirm "OFFBOARD (send o) — MUST be before Explorer; vehicle ready to follow goals"
+pub_key o 8
+echo "[demo] offboard selected. Do not start Explorer until this step finished."
+
+confirm "START EXPLORER (frontier_explorer explorer_node) — only after o"
 : > "$EXPLORER_LOG"
-ros2 run frontier_explorer explorer_node >"$EXPLORER_LOG" 2>&1 &
+# Same params hardware.launch.py passes when explorer:=true (node defaults are sim topics)
+FOV=$(python3 -c "import math,os,yaml;d=yaml.safe_load(open(os.path.expanduser('~/.ego_hw/zed_intrinsics.yaml')));print(math.degrees(2*math.atan(d['width']/2.0/d['fx'])))" 2>/dev/null || echo 73.0)
+ros2 run frontier_explorer explorer_node --ros-args \
+  -p depth_topic:=/zed/zed_node/depth/depth_registered \
+  -p odom_topic:=/mavros/local_position/odom \
+  -p map_size_x:=40.0 -p map_size_y:=40.0 -p fov_deg:="$FOV" \
+  >"$EXPLORER_LOG" 2>&1 &
 EXPLORER_PID=$!
 sleep 1
 echo "[demo] explorer pid $EXPLORER_PID"
 echo "[demo] watch explorer:  tail -f $EXPLORER_LOG"
 echo "[demo] or goals:        ros2 topic echo /goal_pose"
-
-confirm "OFFBOARD (send o) — vehicle starts following explorer goals"
-pub_key o 8
 
 # Immediate next prompt so you can freeze ASAP if anything looks wrong
 confirm "HOVER HERE NOW? (kill explorer + send p) — freezes at current x/y/z"
