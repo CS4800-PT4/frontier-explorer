@@ -1,11 +1,42 @@
 # Clean install check
 
+## What this sets up
+
+This repo is the code for our drone. It maps a room with the ZED camera and flies to the
+edges of what it has seen (frontiers) until the whole room is explored. Two scripts install
+everything it needs on the Jetson Orin Nano (JetPack 6, Ubuntu 22.04):
+
+- `hw/1_jetson_sudo.sh` (sudo): ROS 2 Humble, MAVROS and the system packages, all from apt.
+- `hw/2_jetson_setup.sh` (no sudo): clones and builds the repos below.
+
+| Repo | Version | Job on the drone |
+| --- | --- | --- |
+| [CS4800-PT4/frontier-explorer](https://github.com/CS4800-PT4/frontier-explorer) | `main` | Ours: `explorer_node`, `extrinsic_node`, `vision_relay` and the launch file |
+| [PX4/px4_msgs](https://github.com/PX4/px4_msgs) | `release/1.15` | PX4's ROS 2 messages. Must match the flight controller firmware |
+| [eProsima/Micro-XRCE-DDS-Agent](https://github.com/eProsima/Micro-XRCE-DDS-Agent) | `v2.4.2`, with Fast-DDS `v2.12.2` | Connects ROS 2 to PX4 over the UART |
+| [DongnanHu6556/ego-swarm-ros2](https://github.com/DongnanHu6556/ego-swarm-ros2) | pinned commit + `sim/patches/` | EGO planner: plans paths around obstacles |
+| [DongnanHu6556/px4_ego](https://github.com/DongnanHu6556/px4_ego) | pinned commit + `sim/patches/` | Bridge that turns EGO's paths into PX4 setpoints |
+| [stereolabs/zed-ros2-wrapper](https://github.com/stereolabs/zed-ros2-wrapper) | `ZED_WRAPPER_REF`, matching the ZED SDK | ZED depth and odometry. Only built if the ZED SDK is installed |
+
+The ZED SDK is installed by hand from Stereolabs, since it isn't a repo.
+
+How it fits together on the Jetson:
+
+1. The ZED wrapper publishes depth and the camera's position.
+2. EGO builds a 3D map from the depth. `explorer_node` reads that map, finds the frontiers and
+   gives EGO the next goal. `extrinsic_node` tells EGO where the camera sits on the drone.
+3. EGO plans a path to the goal. The px4_ego bridge turns it into setpoints, and the XRCE agent
+   sends them to PX4 over the UART (TELEM2).
+4. `vision_relay` sends the ZED's position to PX4 through MAVROS (flight controller USB), so
+   PX4 knows where it is indoors without GPS.
+
+One launch file starts all of it. Wiring and PX4 settings are in `hw/README.md`.
+
+## About this check
+
 Runs `hw/1_jetson_sudo.sh` and `hw/2_jetson_setup.sh` on a brand-new Ubuntu 22.04 machine, the
 same way the Jetson runs them, then checks the result. It catches anything that only built
 before because it was already on someone's machine. Plan on about an hour, mostly waiting.
-
-**Branch:** `fix-xrce-fastdds-tag` until PR #25 is merged, then `main`. Older copies of `main`
-fail on the XRCE agent, so don't test those.
 
 You need about 30 GB free, and 8 GB of RAM if you can. Doing this on the real Jetson? Read
 [On the real Jetson](#on-the-real-jetson) first.
@@ -46,8 +77,7 @@ In the VM's terminal:
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git python3-pytest
-# once PR #25 is merged, drop "-b fix-xrce-fastdds-tag"
-git clone -b fix-xrce-fastdds-tag https://github.com/CS4800-PT4/frontier-explorer.git ~/frontier-explorer
+git clone https://github.com/CS4800-PT4/frontier-explorer.git ~/frontier-explorer
 mkdir -p ~/build_logs
 ```
 
@@ -144,7 +174,7 @@ Both scripts are safe to re-run, so fix the problem and run the same command aga
 
 | What you see | What to do |
 | --- | --- |
-| `invalid reference: 2.12.x` | You're on an old copy. Get the branch at the top of this page. |
+| `invalid reference: 2.12.x` | You're on a copy from before PR #25. Clone `main` again. |
 | `Could not get lock` | Ubuntu is updating itself. Wait a few minutes and run the same commands again. |
 | `No such file or directory` on `hw/...` | You're in the wrong folder. Run `cd ~/frontier-explorer` first. |
 | A compiler gets `Killed`, or `c++: fatal error: Killed signal` | Out of memory. Use the out of memory command below. |
