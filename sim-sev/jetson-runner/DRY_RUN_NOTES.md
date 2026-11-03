@@ -1,9 +1,6 @@
 # Jetson live-demo dry-run notes
 
-Captured from the Fedora dual-boot host on **2026-11-02** against the Ubuntu 22.04 partition and the Fedora clone at `/home/sev/frontier-explorer`. The **Jetson Orin Nano itself was not reachable** (campus IP `10.145.158.205` timed out; no Jetson on home LAN SSH). Treat Ubuntu results as a partial desk check only — re-verify on the Jetson tomorrow.
-
 Repo clone on Fedora includes Ubuntu-local work copied into `sim-sev/` (jetson-runner, patches, demo script edits). Nothing in this file was pushed to GitHub unless you push it later.
-
 ---
 
 ## 1) `02_build.sh` dry-run
