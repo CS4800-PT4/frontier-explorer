@@ -167,7 +167,8 @@ sourced, and the planner and explorer start from the demo launch file.
 
 It doesn't test:
 - **The ZED wrapper.** It needs the ZED SDK and CUDA.
-- **ARM,** unless you ran it on a Mac with UTM.
+- **ARM,** unless you ran it on a Mac with UTM. CI runs these same steps on ARM
+  (`.github/workflows/hw-arm.yml`) every Monday and on PRs that touch `hw/`.
 - **The flight controller link.** No XRCE or MAVROS traffic reaches PX4.
 - **`run_demo.sh`.** The checks above only use its launch file.
 

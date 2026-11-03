@@ -1,0 +1,111 @@
+name: Hardware build (ARM)
+
+# Runs hw/1_jetson_sudo.sh and hw/2_jetson_setup.sh on a clean Ubuntu 22.04 ARM64 machine, then
+# the check block from hw/CLEAN_INSTALL.md, the same steps a teammate runs on a clean VM. The
+# Jetson is ARM64 too. No GPU, ZED or flight controller here, so the ZED wrapper is skipped.
+# The weekly run catches upstream changes, like the Fast-DDS branch that was deleted under us.
+
+on:
+  pull_request:
+    paths:
+      - 'hw/**'
+      - 'sim/patches/**'
+      - 'src/frontier_explorer/**'
+      - 'sim-sev/**'
+      - '.github/workflows/hw-arm.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'hw/**'
+      - 'sim/patches/**'
+      - 'src/frontier_explorer/**'
+      - 'sim-sev/**'
+      - '.github/workflows/hw-arm.yml'
+  schedule:
+    - cron: '0 9 * * 1'   # Mondays 09:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: hw-arm-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clean_install:
+    runs-on: ubuntu-22.04-arm
+    # A plain Ubuntu image, so nothing preinstalled on the runner hides a missing dependency
+    container: ubuntu:22.04
+    timeout-minutes: 150
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      TZ: Etc/UTC
+    steps:
+      # What a fresh Ubuntu install has that this image doesn't, plus section 2 of the README
+      - name: Base packages
+        run: |
+          apt-get update
+          apt-get install -y git sudo procps ca-certificates tzdata python3-pytest
+
+      - uses: actions/checkout@v4
+
+      # The README's commands use ~/frontier-explorer and ~/build_logs
+      - name: Paths
+        shell: bash
+        run: |
+          git config --global --add safe.directory '*'
+          ln -sfn "$GITHUB_WORKSPACE" ~/frontier-explorer
+          mkdir -p ~/build_logs
+          echo "LOGS=$HOME/build_logs" >> "$GITHUB_ENV"
+
+      - name: Part 1 (hw/1_jetson_sudo.sh)
+        shell: bash
+        run: |
+          cd ~/frontier-explorer || exit 1
+          sudo DEBIAN_FRONTEND=noninteractive bash hw/1_jetson_sudo.sh 2>&1 | tee ~/build_logs/1_sudo.log
+
+      - name: Part 2 (hw/2_jetson_setup.sh)
+        shell: bash
+        run: |
+          cd ~/frontier-explorer || exit 1
+          bash hw/2_jetson_setup.sh 2>&1 | tee ~/build_logs/2_setup.log
+
+      # Runs the block from hw/CLEAN_INSTALL.md as written, so the README can't drift from CI
+      - name: Checks (hw/CLEAN_INSTALL.md section 5)
+        shell: bash
+        run: |
+          python3 - "$RUNNER_TEMP/check_block.sh" <<'EOF'
+          import re, sys
+          s = open("hw/CLEAN_INSTALL.md").read()
+          b = [x for x in re.findall(r"```bash\n(.*?)```", s, re.S) if "--- XRCE agent" in x]
+          assert len(b) == 1, "expected one check block in hw/CLEAN_INSTALL.md"
+          open(sys.argv[1], "w").write(b[0])
+          EOF
+          bash "$RUNNER_TEMP/check_block.sh"
+
+      # The "What you want to see" table in hw/CLEAN_INSTALL.md
+      - name: Judge check.txt
+        shell: bash
+        run: |
+          f=$RUNNER_TEMP/check_judged.txt
+          tr -d '\r' < "$LOGS/check.txt" > "$f"   # in case it went through Windows
+          fail=0
+          need() { grep -qE "$1" "$f" || { echo "::error::check.txt is missing: $1"; fail=1; }; }
+          need '^aarch64$'
+          need 'local changes: \[0\]'
+          need 'set\(_fastdds_tag v2\.12\.2\)'
+          need 'messages import: ok'
+          need '[0-9]+ passed'
+          need 'agent exit: 124'
+          need 'crashes: none'
+          for n in ego_planner_node traj_server extrinsic_node explorer_node; do need "^$n: running$"; done
+          if grep -nE 'MISSING|NOT RUNNING|not found|[0-9]+ failed|[Ee]rror' "$f"; then
+            echo "::error::check.txt has failures (lines above)"; fail=1
+          fi
+          exit $fail
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hw-arm-logs
+          path: ${{ env.LOGS }}
+          if-no-files-found: ignore
