@@ -82,3 +82,14 @@ and QGC altitude climbs. A zero setpoint means the old node is still running.
 - `live-demo/` — class demo README + `run_demo.sh`
 
 Professor starts at `sim-sev/live-demo/README.md` (§0 = set your ports, then launch + helper).
+
+## Jetson live install (sim-sev only)
+
+Professor / Jetson Orin Nano bootstrap (ROS, MAVROS, **ZED SDK**, build, live demo):
+
+See [`jetson-runner/README.md`](jetson-runner/README.md). Numbered scripts `00`…`06`. First time:
+
+```bash
+cd ~/frontier-explorer/sim-sev/jetson-runner
+bash 00_bootstrap.sh
+```

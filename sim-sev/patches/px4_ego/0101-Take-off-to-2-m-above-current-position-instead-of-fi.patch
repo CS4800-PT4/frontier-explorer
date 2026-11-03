@@ -1,0 +1,34 @@
+From 19b878fda1bca0fa33a663da72e473164e6de4cd Mon Sep 17 00:00:00 2001
+From: sev <sev@localhost>
+Date: Fri, 30 Oct 2026 12:04:13 -0700
+Subject: [PATCH] Take off to 2 m above current position instead of fixed 0.9 m
+
+---
+ src/px4_ego_py/px4_ego_py/offboard_control_test.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/px4_ego_py/px4_ego_py/offboard_control_test.py b/src/px4_ego_py/px4_ego_py/offboard_control_test.py
+index b9616d2..549364d 100644
+--- a/src/px4_ego_py/px4_ego_py/offboard_control_test.py
++++ b/src/px4_ego_py/px4_ego_py/offboard_control_test.py
+@@ -224,7 +224,7 @@ class OffboardControl(Node):
+             if not self.takeoff_hover_des_set:
+                 self.hover_setpoint.position[0] = self.vehicle_local_position.x 
+                 self.hover_setpoint.position[1] = self.vehicle_local_position.y 
+-                self.hover_setpoint.position[2] = -0.9
++                self.hover_setpoint.position[2] = self.vehicle_local_position.z - 2.0
+                 self.hover_setpoint.yaw = self.vehicle_local_position.heading
+                 self.takeoff_hover_des_set = True
+             if self.takeoff_hover_des_set:
+@@ -234,7 +234,7 @@ class OffboardControl(Node):
+             if not self.takeoff_hover_des_set:
+                 self.hover_setpoint.position[0] = self.vehicle_visual_odom.position[0]
+                 self.hover_setpoint.position[1] = self.vehicle_visual_odom.position[1]
+-                self.hover_setpoint.position[2] = -0.9
++                self.hover_setpoint.position[2] = self.vehicle_local_position.z - 2.0
+                 q_att = self.vehicle_visual_odom.q
+                 self.hover_setpoint.yaw = self.quaternion_to_yaw(q_att[0],q_att[1],q_att[2],q_att[3])
+                 self.takeoff_hover_des_set = True
+-- 
+2.34.1
+
