@@ -9,6 +9,8 @@ ros2 launch frontier_explorer hardware.launch.py camera_model:=zed2i
 
 `docs/STACK.md` shows how the pieces connect in the sim and on the drone.
 
+To check the setup scripts from scratch on a clean VM first, see `hw/CLEAN_INSTALL.md`.
+
 ## What runs on the drone
 
 | Piece | Talks to | Link |

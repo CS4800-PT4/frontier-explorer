@@ -55,6 +55,8 @@ clone --branch "$PX4_MSGS_BRANCH" https://github.com/PX4/px4_msgs.git ~/ros2_ws/
 # --- Micro XRCE-DDS agent (v2.4.2 is the version the PX4 1.15 ROS 2 guide uses) ---
 if ! command -v MicroXRCEAgent >/dev/null; then
   clone --branch v2.4.2 https://github.com/eProsima/Micro-XRCE-DDS-Agent.git ~/Micro-XRCE-DDS-Agent
+  # v2.4.2 builds Fast-DDS from the 2.12.x branch, which eProsima has since deleted. Use its last tag.
+  sed -i 's/set(_fastdds_tag 2\.12\.x)/set(_fastdds_tag v2.12.2)/' ~/Micro-XRCE-DDS-Agent/CMakeLists.txt
   ( cd ~/Micro-XRCE-DDS-Agent && mkdir -p build && cd build && cmake .. && make && sudo make install && sudo ldconfig /usr/local/lib/ )
 fi
 
