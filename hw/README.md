@@ -31,16 +31,20 @@ To check the setup scripts from scratch on a clean VM first, see `hw/CLEAN_INSTA
 2. `sudo bash hw/1_jetson_sudo.sh`: ROS 2 Humble, MAVROS (from apt) and system packages, plus
    the CUDA toolkit if the Jetson doesn't have it. Log out and back in afterwards so the serial
    ports work (it adds you to `dialout`).
-3. Install the ZED SDK for your JetPack from https://www.stereolabs.com/developers/release.
-   If the camera is the first-generation ZED (sold as "ZED 2K Stereo"), check the SDK release
-   notes say it is still supported.
-4. `bash hw/2_jetson_setup.sh`: builds px4_msgs (release/1.15), the XRCE agent, EGO, the
-   bridge, this repo and the ZED wrapper, then prints the lines to add to `~/.bashrc`.
-   Pin the wrapper to the release that matches your SDK: `ZED_WRAPPER_REF=<tag> bash hw/2_jetson_setup.sh`.
-   It builds one package at a time so the Orin Nano doesn't run out of memory
+3. `bash hw/2_jetson_setup.sh`: builds px4_msgs (release/1.15), the XRCE agent, EGO, the
+   bridge and this repo, then runs `hw/zed_setup.sh` for the ZED, and prints the lines to add
+   to `~/.bashrc`. It builds one package at a time so the Orin Nano doesn't run out of memory
    (`COLCON_WORKERS=2` is faster if you have swap). Safe to re-run if a step fails.
+   - **ZED SDK:** if `/usr/local/zed` exists, the installed SDK is kept as is. If not, it
+     downloads SDK 5.5 for this JetPack, or the newest older one Stereolabs builds for it, and
+     installs it (it asks for your password). Pick another with `ZED_SDK_VERSION=5.2`.
+   - **ZED wrapper:** builds the wrapper release made for that SDK (SDK 5.5 -> `v5.5.0`). If it
+     doesn't build, it tries the next two older releases. Logs: `~/zed_ws/logs/`. Force one
+     with `ZED_WRAPPER_REF=<tag>`.
+   - The first-generation ZED (sold as "ZED 2K Stereo") is still a camera model in SDK 5.5
+     (`sl::MODEL::ZED` in its headers, checked Nov 2026).
 
-Check the flight controller's firmware in QGroundControl first. If it isn't 1.15, run step 4
+Check the flight controller's firmware in QGroundControl first. If it isn't 1.15, run step 3
 with `PX4_MSGS_BRANCH=release/1.xx` to match. Mismatched messages show topics with no data.
 
 ## 2. Wiring and PX4 settings (QGroundControl)
@@ -175,8 +179,10 @@ Launch arguments (`ros2 launch frontier_explorer hardware.launch.py --show-args`
 
 ## Not confirmed yet (check on the Jetson)
 
-- ZED wrapper parameter and topic names were checked against the wrapper's master branch
-  (Oct 2026). An older wrapper may differ: pass `depth_topic:=`, `zed_odom:=` and `zed_status:=`.
+- ZED wrapper topic and parameter names (`depth/depth_registered`, `odom`, `pose/status` with
+  `PosTrackStatus`, and the ones in `config/zed_override.yaml`) are the same in releases v5.2.2
+  through v5.5.0 and master (Nov 2026). Part 2 builds the release for the installed SDK; if an
+  older one differs, pass `depth_topic:=`, `zed_odom:=` and `zed_status:=`.
 - The UART device name (`ttyTHS1` vs `ttyTHS0`) depends on the JetPack version.
 - XRCE agent v2.4.2 is the version the PX4 1.15 guide uses.
 - Start order. In the sim, PX4 SITL (1.18 beta) crashed when the XRCE agent started after PX4

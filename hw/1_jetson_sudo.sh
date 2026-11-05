@@ -2,8 +2,7 @@
 # Part 1 on the Jetson (needs sudo): ROS 2 Humble and the system packages for the
 # drone stack. JetPack 6 is Ubuntu 22.04, so this is the same as a normal Humble install.
 # Run once:  sudo bash hw/1_jetson_sudo.sh
-# The ZED SDK is separate: download the installer for your JetPack version from
-# https://www.stereolabs.com/developers/release and run it before hw/2_jetson_setup.sh.
+# The ZED SDK comes next, from hw/2_jetson_setup.sh (hw/zed_setup.sh), not from apt.
 set -euo pipefail
 
 . /etc/os-release
@@ -23,7 +22,7 @@ fi
 apt-get update
 apt-get install -y \
   ros-humble-ros-base ros-humble-rviz2 python3-colcon-common-extensions python3-rosdep \
-  build-essential cmake git wget \
+  build-essential cmake git wget curl zstd \
   ros-humble-pcl-ros ros-humble-pcl-conversions ros-humble-cv-bridge \
   ros-humble-image-transport ros-humble-laser-geometry ros-humble-tf2-geometry-msgs \
   ros-humble-mavros ros-humble-mavros-extras geographiclib-tools libgeographic-dev \
@@ -50,4 +49,4 @@ fi
 U=${SUDO_USER:-}
 if [ -n "$U" ]; then usermod -aG dialout "$U"; echo "Added $U to dialout (log out and back in)"; fi
 
-echo "=== Part 1 done. Install the ZED SDK, then run (no sudo): bash hw/2_jetson_setup.sh ==="
+echo "=== Part 1 done. Next (no sudo, it installs the ZED SDK too): bash hw/2_jetson_setup.sh ==="

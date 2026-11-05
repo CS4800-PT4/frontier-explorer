@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
 # Part 2 on the Jetson (no sudo): clone, patch and build everything the drone runs.
-# Run after: sudo bash hw/1_jetson_sudo.sh, and the ZED SDK installer. Safe to re-run.
-# Builds: px4_msgs (release/1.15), Micro XRCE-DDS agent, EGO planner, the px4_ego bridge,
-# this repo and the ZED wrapper. MAVROS comes from apt (hw/1). No Gazebo or PX4 SITL.
+# Run after: sudo bash hw/1_jetson_sudo.sh. Safe to re-run.
+# Builds: px4_msgs (release/1.15), Micro XRCE-DDS agent, EGO planner, the px4_ego bridge and
+# this repo. Then hw/zed_setup.sh installs the ZED SDK if it's missing (Jetson only) and builds
+# the wrapper release that matches it. MAVROS comes from apt (hw/1). No Gazebo or PX4 SITL.
 #   PX4_MSGS_BRANCH   px4_msgs branch matching the flight controller (default release/1.15)
-#   ZED_WRAPPER_REF   zed-ros2-wrapper tag/branch to build (default master; pin it to the
-#                     release that matches your ZED SDK version, see the wrapper's releases)
+#   ZED_*             ZED SDK and wrapper settings, see hw/zed_setup.sh
 set -eo pipefail
 
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/.." && pwd)
 PATCHES=$REPO/sim/patches
 PX4_MSGS_BRANCH=${PX4_MSGS_BRANCH:-release/1.15}
-ZED_WRAPPER_REF=${ZED_WRAPPER_REF:-master}
 # The Orin Nano has 8 GB shared with the GPU. MAKEFLAGS limits compilers per package and
 # --parallel-workers limits packages at once, so at most 4 compilers run together.
 export MAKEFLAGS=${MAKEFLAGS:--j4}
@@ -78,22 +77,14 @@ source ~/ego_ws/install/setup.bash
 # --- This repo (before the ZED wrapper, so a wrapper problem doesn't block it) ---
 ( cd "$REPO" && $BUILD --symlink-install --packages-select frontier_explorer )
 
-# --- ZED wrapper (needs the ZED SDK, which needs the Jetson's CUDA) ---
-if [ -d /usr/local/zed ] && [ ! -x /usr/local/cuda/bin/nvcc ]; then
-  echo "!!! No CUDA toolkit (/usr/local/cuda/bin/nvcc): run sudo bash hw/1_jetson_sudo.sh again"
-  ZED_OK=no
-elif [ -d /usr/local/zed ]; then
-  mkdir -p ~/zed_ws/src
-  clone --recursive https://github.com/stereolabs/zed-ros2-wrapper.git ~/zed_ws/src/zed-ros2-wrapper
-  ( cd ~/zed_ws/src/zed-ros2-wrapper && git fetch -q --tags origin && git checkout -q "$ZED_WRAPPER_REF" \
-      && git submodule update --init --recursive )
-  ( cd ~/zed_ws && rosdep update && rosdep install --from-paths src --ignore-src -r -y \
-      && $BUILD --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release )
-  ZED_OK=yes
-else
-  echo "!!! ZED SDK not found in /usr/local/zed: install it, then run this script again"
-  ZED_OK=no
-fi
+# --- ZED SDK + wrapper, matched by version (last, so a ZED problem doesn't block the rest) ---
+zed_rc=0
+bash "$HERE/zed_setup.sh" || zed_rc=$?
+case $zed_rc in
+  0) ZED_OK=yes ;;
+  3) ZED_OK="no, no ZED SDK" ;;
+  *) ZED_OK="no, it failed (see above)" ;;
+esac
 
 cat <<EOF
 === Part 2 done (ZED wrapper built: $ZED_OK) ===
@@ -106,3 +97,5 @@ Add to ~/.bashrc:
   source $REPO/install/setup.bash
 Next: hw/README.md, "Bring-up".
 EOF
+# A ZED build that failed should fail the script; no SDK (a VM, or CI) is fine
+if [ "$zed_rc" != 0 ] && [ "$zed_rc" != 3 ]; then exit 1; fi
