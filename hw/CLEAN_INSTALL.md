@@ -16,9 +16,10 @@ everything it needs on the Jetson Orin Nano (JetPack 6, Ubuntu 22.04):
 | [eProsima/Micro-XRCE-DDS-Agent](https://github.com/eProsima/Micro-XRCE-DDS-Agent) | `v2.4.2`, with Fast-DDS `v2.12.2` | Connects ROS 2 to PX4 over the UART |
 | [DongnanHu6556/ego-swarm-ros2](https://github.com/DongnanHu6556/ego-swarm-ros2) | pinned commit + `sim/patches/` | EGO planner: plans paths around obstacles |
 | [DongnanHu6556/px4_ego](https://github.com/DongnanHu6556/px4_ego) | pinned commit + `sim/patches/` | Bridge that turns EGO's paths into PX4 setpoints |
-| [stereolabs/zed-ros2-wrapper](https://github.com/stereolabs/zed-ros2-wrapper) | `ZED_WRAPPER_REF`, matching the ZED SDK | ZED depth and odometry. Only built if the ZED SDK is installed |
+| [stereolabs/zed-ros2-wrapper](https://github.com/stereolabs/zed-ros2-wrapper) | the release made for the installed ZED SDK | ZED depth and odometry. Only built if the ZED SDK is installed |
 
-The ZED SDK is installed by hand from Stereolabs, since it isn't a repo.
+The ZED SDK isn't a repo. On a Jetson, part 2 downloads and installs it if it's missing, then
+builds the wrapper release that matches it (`hw/zed_setup.sh`).
 
 How it fits together on the Jetson:
 
@@ -104,7 +105,7 @@ bash hw/2_jetson_setup.sh 2>&1 | tee ~/build_logs/2_setup.log; echo "exit: ${PIP
 ```
 
 It should end with `exit: 0`. On a VM it also prints `ZED SDK not found` and
-`ZED wrapper built: no`. That's expected, because a VM can't run the ZED SDK.
+`ZED wrapper built: no, no ZED SDK`. That's expected, because a VM can't run the ZED SDK.
 
 On a VM, ignore what the scripts tell you to do next (install the ZED SDK, log out, edit
 `~/.bashrc`, go to `hw/README.md`). The checks below set up everything they need.
@@ -221,11 +222,12 @@ them first, because part 1 changes the system.
    `sudo apt-get install -s nvidia-jetpack-dev | grep -E '^(Inst|Remv)' | grep -i opencv`.
    It changes nothing. If it prints any line, stop and post it to the team before part 1.
 5. Run part 1, then log out and back in so the serial ports work.
-6. Install the ZED SDK for your JetPack before part 2:
-   https://www.stereolabs.com/developers/release
-7. Check the flight controller's firmware in QGroundControl. Run part 2 with the wrapper release
-   that matches the SDK, and if the firmware isn't 1.15, the matching messages too:
-   `ZED_WRAPPER_REF=<tag> PX4_MSGS_BRANCH=release/1.15 bash hw/2_jetson_setup.sh`. It should end
-   with `ZED wrapper built: yes`.
+6. Check for a ZED SDK: `ls /usr/local/zed`. If it's there, part 2 keeps it and builds the
+   wrapper release made for it. If not, part 2 downloads and installs SDK 5.5 for this JetPack
+   (or the newest older one that supports it). Use `ZED_SDK_VERSION=<version>` to pick another.
+7. Check the flight controller's firmware in QGroundControl. Run part 2, and if the firmware
+   isn't 1.15, with the matching messages:
+   `PX4_MSGS_BRANCH=release/1.xx bash hw/2_jetson_setup.sh` (1.xx = the firmware). It should end with
+   `ZED wrapper built: yes`.
 8. Run the checks in section 5, then carry on from section 2 of `hw/README.md` (wiring, PX4
    settings, intrinsics and the bench check).

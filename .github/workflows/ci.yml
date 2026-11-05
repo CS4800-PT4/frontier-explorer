@@ -37,3 +37,6 @@ jobs:
 
       - name: Check shell scripts
         run: shellcheck -S error sim/*.sh hw/*.sh
+
+      - name: ZED version picking (hw/zed_setup.sh)
+        run: bash hw/test_zed_setup.sh
