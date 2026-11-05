@@ -95,7 +95,8 @@ Add to ~/.bashrc:
   source ~/px4_ego_ws/install/setup.bash
   source ~/zed_ws/install/setup.bash
   source $REPO/install/setup.bash
-Next: hw/README.md, "Bring-up".
+(or the block in hw/README.md section 1, which also sets ROS_DOMAIN_ID)
+Next: hw/README.md sections 2 and 3, then the demo (4) or the bench check (5).
 EOF
 # A ZED build that failed should fail the script; no SDK (a VM, or CI) is fine
 if [ "$zed_rc" != 0 ] && [ "$zed_rc" != 3 ]; then exit 1; fi
