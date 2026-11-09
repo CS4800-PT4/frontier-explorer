@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Save ZED depth intrinsics for hardware.launch.py (sim-sev/jetson-runner copy).
 TOPIC=${1:-/zed/zed_node/depth/camera_info}
-OUT=${2:-$HOME/.ego_hw/zed_intrinsics.yaml}
 HERE=$(cd "$(dirname "$0")" && pwd)
 # shellcheck disable=SC1091
 source "$HERE/03_env.sh"
+OUT="${2:-$WS_ROOT/.ego_hw/zed_intrinsics.yaml}"
 
 python3 - "$TOPIC" "$OUT" <<'PY'
 import os, sys, time
