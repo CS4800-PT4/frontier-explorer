@@ -1,0 +1,71 @@
+Live demo — ZED intrinsics (once) then run
+==========================================
+Do this on the Jetson. Paths assume the repo is at ~/frontier-explorer
+and the ZED wrapper was built in ~/zed_ws (adjust if different).
+
+0) Check ports before launch
+----------------------------
+ls /dev/ttyACM* /dev/ttyUSB* /dev/ttyTHS*
+
+1) Terminal 1 — solo ZED (VGA override)
+---------------------------------------
+source /opt/ros/humble/setup.bash
+source ~/zed_ws/install/setup.bash
+ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zed2i \
+  ros_params_override_path:=$HOME/frontier-explorer/sim-sev/config/zed_override.yaml
+
+Leave this running until step 2 finishes.
+
+2) Terminal 2 — capture intrinsics
+----------------------------------
+bash ~/frontier-explorer/hw/zed_intrinsics.sh
+cat ~/.ego_hw/zed_intrinsics.yaml
+
+You only need this once per camera/resolution. The file is NOT in the repo;
+it is written under ~/.ego_hw/
+
+3) Terminal 1 — stop solo ZED
+-----------------------------
+Press Ctrl+C in Terminal 1.
+(Why: hardware.launch.py starts its own ZED; two wrappers fight the same camera.)
+
+4) Terminal 1 — full stack
+--------------------------
+source /opt/ros/humble/setup.bash
+source ~/zed_ws/install/setup.bash
+source ~/ego_ws/install/setup.bash
+source ~/px4_ego/install/setup.bash
+# if your bridge install is elsewhere:
+# source ~/px4_ego_ws/install/setup.bash
+source ~/frontier-explorer/install/setup.bash
+
+ros2 launch ~/frontier-explorer/sim-sev/hardware.launch.py
+
+Optional overrides if ports differ:
+ros2 launch ~/frontier-explorer/sim-sev/hardware.launch.py \
+  fcu_url:=/dev/ttyACM0:57600 \
+  camera_model:=zed2i \
+  xrce_args:="serial --dev /dev/ttyTHS1 -b 921600"
+
+5) Terminal 2 — live demo helper
+--------------------------------
+cd ~/frontier-explorer/sim-sev/live-demo
+bash run_demo.sh
+
+Confirm each step with Enter. Keys: t takeoff, o offboard, p hover, l land, d disarm.
+
+XRCE args (what they mean)
+--------------------------
+Default in sim-sev/hardware.launch.py:
+  xrce_args := serial --dev /dev/ttyTHS1 -b 921600
+
+That is arguments passed to MicroXRCEAgent:
+  serial          = talk over a serial UART (not UDP like the sim)
+  --dev /dev/ttyTHS1 = Jetson UART device wired to FC TELEM2
+  -b 921600       = baud; must match PX4 SER_TEL2_BAUD and UXRCE_DDS_CFG=TELEM2
+
+How we know:
+  - Team hw/README.md and hardware.launch.py defaults for Jetson Orin Nano
+  - ls /dev/ttyTHS* on the Jetson (use the device that appears for that UART)
+  - QGC: UXRCE_DDS_CFG = TELEM 2, SER_TEL2_BAUD = 921600
+  - Sim uses UDP instead: udp4 -p 8888 (not for live hardware)

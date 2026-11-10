@@ -6,6 +6,7 @@ set -eo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 SIM_SEV=$(cd "$HERE/.." && pwd)
 REPO=$(cd "$SIM_SEV/.." && pwd)
+WS_ROOT="${WS_ROOT:-$(cd "$REPO/.." && pwd)}"
 PATCHES=$REPO/sim/patches
 SEV_PATCHES=$REPO/sim-sev/patches
 PX4_MSGS_BRANCH=${PX4_MSGS_BRANCH:-release/1.15}
@@ -54,45 +55,45 @@ apply_patches() {
 }
 
 echo "=== px4_msgs ($PX4_MSGS_BRANCH)"
-mkdir -p ~/ros2_ws/src
-clone --branch "$PX4_MSGS_BRANCH" https://github.com/PX4/px4_msgs.git ~/ros2_ws/src/px4_msgs
-( cd ~/ros2_ws/src/px4_msgs && git fetch -q origin "$PX4_MSGS_BRANCH" && git checkout -q "$PX4_MSGS_BRANCH" )
-( cd ~/ros2_ws && $BUILD --cmake-args -DCMAKE_BUILD_TYPE=Release )
+mkdir -p "$WS_ROOT/ros2_ws/src"
+clone --branch "$PX4_MSGS_BRANCH" https://github.com/PX4/px4_msgs.git "$WS_ROOT/ros2_ws/src/px4_msgs"
+( cd "$WS_ROOT/ros2_ws/src/px4_msgs" && git fetch -q origin "$PX4_MSGS_BRANCH" && git checkout -q "$PX4_MSGS_BRANCH" )
+( cd "$WS_ROOT/ros2_ws" && $BUILD --cmake-args -DCMAKE_BUILD_TYPE=Release )
 
 echo "=== Micro XRCE-DDS Agent"
 if ! command -v MicroXRCEAgent >/dev/null; then
-  clone --branch v2.4.2 https://github.com/eProsima/Micro-XRCE-DDS-Agent.git ~/Micro-XRCE-DDS-Agent
-  sed -i 's/set(_fastdds_tag 2\.12\.x)/set(_fastdds_tag v2.12.2)/' ~/Micro-XRCE-DDS-Agent/CMakeLists.txt
-  ( cd ~/Micro-XRCE-DDS-Agent && mkdir -p build && cd build && cmake .. && make && sudo make install && sudo ldconfig /usr/local/lib/ )
+  clone --branch v2.4.2 https://github.com/eProsima/Micro-XRCE-DDS-Agent.git "$WS_ROOT/Micro-XRCE-DDS-Agent"
+  sed -i 's/set(_fastdds_tag 2\.12\.x)/set(_fastdds_tag v2.12.2)/' "$WS_ROOT/Micro-XRCE-DDS-Agent/CMakeLists.txt"
+  ( cd "$WS_ROOT/Micro-XRCE-DDS-Agent" && mkdir -p build && cd build && cmake .. && make && sudo make install && sudo ldconfig /usr/local/lib/ )
 fi
 
 echo "=== EGO planner"
 # shellcheck disable=SC1091
-source ~/ros2_ws/install/setup.bash
-mkdir -p ~/ego_ws/src
-clone https://github.com/DongnanHu6556/ego-swarm-ros2.git ~/ego_ws/src/ego-swarm-ros2
-apply_patches ~/ego_ws/src/ego-swarm-ros2 ego-swarm-ros2 $EGO_BASE
-( cd ~/ego_ws && $BUILD --symlink-install --packages-up-to ego_planner quadrotor_msgs \
+source "$WS_ROOT/ros2_ws/install/setup.bash"
+mkdir -p "$WS_ROOT/ego_ws/src"
+clone https://github.com/DongnanHu6556/ego-swarm-ros2.git "$WS_ROOT/ego_ws/src/ego-swarm-ros2"
+apply_patches "$WS_ROOT/ego_ws/src/ego-swarm-ros2" ego-swarm-ros2 $EGO_BASE
+( cd "$WS_ROOT/ego_ws" && $BUILD --symlink-install --packages-up-to ego_planner quadrotor_msgs \
     --cmake-args -DCMAKE_BUILD_TYPE=Release )
 
 echo "=== px4_ego bridge"
-mkdir -p ~/px4_ego_ws/src
-clone https://github.com/DongnanHu6556/px4_ego.git ~/px4_ego_ws/src/px4_ego
-apply_patches ~/px4_ego_ws/src/px4_ego px4_ego $PX4_EGO_BASE
-apply_patches ~/px4_ego_ws/src/px4_ego px4_ego $PX4_EGO_BASE "$SEV_PATCHES"  # sim-sev: 2 m takeoff
+mkdir -p "$WS_ROOT/px4_ego_ws/src"
+clone https://github.com/DongnanHu6556/px4_ego.git "$WS_ROOT/px4_ego_ws/src/px4_ego"
+apply_patches "$WS_ROOT/px4_ego_ws/src/px4_ego" px4_ego $PX4_EGO_BASE
+apply_patches "$WS_ROOT/px4_ego_ws/src/px4_ego" px4_ego $PX4_EGO_BASE "$SEV_PATCHES"  # sim-sev: 2 m takeoff
 # shellcheck disable=SC1091
-source ~/ego_ws/install/setup.bash
-( cd ~/px4_ego_ws && $BUILD --symlink-install )
+source "$WS_ROOT/ego_ws/install/setup.bash"
+( cd "$WS_ROOT/px4_ego_ws" && $BUILD --symlink-install )
 
 echo "=== frontier_explorer (this repo)"
 ( cd "$REPO" && $BUILD --symlink-install --packages-select frontier_explorer )
 
 echo "=== zed-ros2-wrapper ($ZED_WRAPPER_REF)"
-mkdir -p ~/zed_ws/src
-clone --recursive https://github.com/stereolabs/zed-ros2-wrapper.git ~/zed_ws/src/zed-ros2-wrapper
-( cd ~/zed_ws/src/zed-ros2-wrapper && git fetch -q --tags origin && git checkout -q "$ZED_WRAPPER_REF" \
+mkdir -p "$WS_ROOT/zed_ws/src"
+clone --recursive https://github.com/stereolabs/zed-ros2-wrapper.git "$WS_ROOT/zed_ws/src/zed-ros2-wrapper"
+( cd "$WS_ROOT/zed_ws/src/zed-ros2-wrapper" && git fetch -q --tags origin && git checkout -q "$ZED_WRAPPER_REF" \
     && git submodule update --init --recursive )
-( cd ~/zed_ws && rosdep update && rosdep install --from-paths src --ignore-src -r -y \
+( cd "$WS_ROOT/zed_ws" && rosdep update && rosdep install --from-paths src --ignore-src -r -y \
     && $BUILD --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release )
 
 cat <<MSG
