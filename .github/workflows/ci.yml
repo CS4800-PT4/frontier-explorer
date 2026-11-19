@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 jobs:
-  frontier_explorer:
+  uav_frontier_exploration:
     runs-on: ubuntu-22.04
     container: ros:humble
     steps:
@@ -16,27 +16,24 @@ jobs:
         run: |
           apt-get update
           rosdep update
-          rosdep install --from-paths src --ignore-src -y
+          rosdep install --from-paths uav-explorer/uav_frontier_exploration --ignore-src -y
           apt-get install -y python3-pytest python3-flake8 shellcheck
 
       - name: Build
         shell: bash
         run: |
           source /opt/ros/humble/setup.bash
-          colcon build --packages-select frontier_explorer
+          colcon build --base-paths uav-explorer/uav_frontier_exploration --packages-select uav_frontier_exploration
 
       - name: Unit tests
         shell: bash
         run: |
           source /opt/ros/humble/setup.bash
           source install/setup.bash
-          cd src/frontier_explorer && python3 -m pytest test -q
+          cd uav-explorer/uav_frontier_exploration && python3 -m pytest test -q
 
       - name: Lint Python
-        run: python3 -m flake8 --max-line-length 110 --exclude template_node.py src/frontier_explorer sim/fake_zed.py
+        run: python3 -m flake8 --max-line-length 110 uav-explorer/uav_frontier_exploration gazebo-sim/launch/fake_zed.py
 
       - name: Check shell scripts
-        run: shellcheck -S error sim/*.sh hw/*.sh
-
-      - name: ZED version picking (hw/zed_setup.sh)
-        run: bash hw/test_zed_setup.sh
+        run: shellcheck -S error uav-explorer/jetson-runner/*.sh gazebo-sim/setup/*.sh gazebo-sim/scripts/*.sh gazebo-sim/tests/*.sh

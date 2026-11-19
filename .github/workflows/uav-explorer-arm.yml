@@ -1,0 +1,138 @@
+name: UAV Explorer ARM build
+
+# Runs uav-explorer/jetson-runner/01_sudo_install.sh and 02_build.sh on a clean Ubuntu 22.04
+# ARM64 container, then runs an inline smoke check of the built stack. No GPU, ZED, or flight
+# controller is present on the runner, so NON_JETSON=1 / SKIP_ZED_SDK=1 / SKIP_ZED_WRAPPER=1
+# skips the Jetson-only CUDA and ZED SDK/wrapper steps.
+# The weekly run catches upstream changes, like the Fast-DDS branch that was deleted under us.
+
+on:
+  pull_request:
+    paths:
+      - 'uav-explorer/**'
+      - '.github/workflows/uav-explorer-arm.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'uav-explorer/**'
+      - '.github/workflows/uav-explorer-arm.yml'
+  schedule:
+    - cron: '0 9 * * 1'   # Mondays 09:00 UTC
+  workflow_dispatch:
+
+concurrency:
+  group: uav-explorer-arm-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clean_install:
+    runs-on: ubuntu-22.04-arm
+    # A plain Ubuntu image, so nothing preinstalled on the runner hides a missing dependency
+    container: ubuntu:22.04
+    timeout-minutes: 150
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      TZ: Etc/UTC
+      NON_JETSON: '1'
+      SKIP_ZED_SDK: '1'
+      SKIP_ZED_WRAPPER: '1'
+    steps:
+      - name: Base packages
+        run: |
+          apt-get update
+          apt-get install -y git sudo procps ca-certificates tzdata python3-pytest
+
+      - uses: actions/checkout@v4
+
+      - name: Paths
+        shell: bash
+        run: |
+          git config --global --add safe.directory '*'
+          ln -sfn "$GITHUB_WORKSPACE" ~/frontier-explorer
+          mkdir -p ~/build_logs
+          echo "LOGS=$HOME/build_logs" >> "$GITHUB_ENV"
+
+      - name: Part 1 (uav-explorer/jetson-runner/01_sudo_install.sh)
+        shell: bash
+        run: |
+          cd ~/frontier-explorer || exit 1
+          sudo DEBIAN_FRONTEND=noninteractive NON_JETSON=1 SKIP_ZED_SDK=1 \
+            bash uav-explorer/jetson-runner/01_sudo_install.sh 2>&1 | tee ~/build_logs/1_sudo.log
+
+      - name: Part 2 (uav-explorer/jetson-runner/02_build.sh)
+        shell: bash
+        run: |
+          cd ~/frontier-explorer || exit 1
+          NON_JETSON=1 SKIP_ZED_WRAPPER=1 \
+            bash uav-explorer/jetson-runner/02_build.sh 2>&1 | tee ~/build_logs/2_setup.log
+
+      - name: Smoke checks (scripts, imports, XRCE, hardware.launch.py)
+        shell: bash
+        run: |
+          set -eo pipefail
+          cd ~/frontier-explorer
+          # shellcheck disable=SC1091
+          source uav-explorer/jetson-runner/03_env.sh
+          {
+            uname -m
+            echo "local changes: [$(git status --porcelain | wc -l)]"
+            grep -E 'set\(_fastdds_tag ' "$WS_ROOT/Micro-XRCE-DDS-Agent/CMakeLists.txt"
+            python3 -c "import px4_msgs.msg, uav_frontier_exploration; print('messages import: ok')"
+            for s in uav-explorer/jetson-runner/*.sh; do bash -n "$s"; done
+            echo "scripts syntax: ok"
+            python3 -m py_compile uav-explorer/hardware.launch.py
+            echo "launch syntax: ok"
+
+            echo "--- XRCE agent"
+            set +e
+            timeout 3 MicroXRCEAgent udp4 -p 8888 >/dev/null 2>&1
+            echo "agent exit: $?"
+            set -e
+
+            echo "--- hardware.launch.py smoke"
+            ros2 launch uav-explorer/hardware.launch.py \
+              zed:=false mavros:=false xrce:=false vision:=false explorer:=true \
+              fx:=528.0 fy:=528.0 cx:=336.0 cy:=188.0 >"$LOGS/launch.log" 2>&1 &
+            LPID=$!
+            sleep 15
+            for n in ego_planner_node traj_server extrinsic_node exploration_manager; do
+              if pgrep -f "$n" >/dev/null; then echo "$n: running"; else echo "$n: NOT RUNNING"; fi
+            done
+            kill -INT "$LPID" 2>/dev/null || true
+            sleep 3
+            kill -9 "$LPID" 2>/dev/null || true
+            if grep -qiE 'traceback|segmentation fault|process has died' "$LOGS/launch.log"; then
+              echo "crashes: found"
+            else
+              echo "crashes: none"
+            fi
+          } 2>&1 | tee "$LOGS/check.txt"
+
+      - name: Judge check.txt
+        shell: bash
+        run: |
+          f=$RUNNER_TEMP/check_judged.txt
+          tr -d '\r' < "$LOGS/check.txt" > "$f"
+          fail=0
+          need() { grep -qE "$1" "$f" || { echo "::error::check.txt is missing: $1"; fail=1; }; }
+          need '^aarch64$'
+          need 'local changes: \[0\]'
+          need 'set\(_fastdds_tag v2\.12\.2\)'
+          need 'messages import: ok'
+          need 'scripts syntax: ok'
+          need 'launch syntax: ok'
+          need 'agent exit: 124'
+          need 'crashes: none'
+          for n in ego_planner_node traj_server extrinsic_node exploration_manager; do need "^$n: running$"; done
+          if grep -nE 'MISSING|NOT RUNNING|not found|[0-9]+ failed|[Ee]rror' "$f"; then
+            echo "::error::check.txt has failures (lines above)"; fail=1
+          fi
+          exit $fail
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uav-explorer-arm-logs
+          path: ${{ env.LOGS }}
+          if-no-files-found: ignore
