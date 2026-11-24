@@ -100,13 +100,14 @@ def intrinsics(context):
     cfg = context.launch_configurations
     given = {k: cfg[k] for k in ('fx', 'fy', 'cx', 'cy') if cfg[k]}
     if len(given) == 4:
-        return {k: number(context, k) for k in given}
+        cam = {k: number(context, k) for k in given}
+        cam['source'] = 'launch args fx:= fy:= cx:= cy:= (NOT the captured file)'
+        return cam
     if given:
         raise RuntimeError('give all of fx, fy, cx, cy or none of them')
     path = os.path.expanduser(cfg['intrinsics_file'])
     if not os.path.isfile(path):
-        raise RuntimeError(f'no camera intrinsics: run bash uav-explorer/jetson-runner/05_capture_intrinsics.sh first '
-                           f'(writes {path}) or pass fx:= fy:= cx:= cy:=')
+        return None
     with open(path) as f:
         data = yaml.safe_load(f) or {}
     missing = [k for k in ('fx', 'fy', 'cx', 'cy') if k not in data]
@@ -119,6 +120,7 @@ def intrinsics(context):
     cam = {k: float(data[k]) for k in ('fx', 'fy', 'cx', 'cy')}
     if w:
         cam['width'] = w
+    cam['source'] = path
     return cam
 
 
@@ -175,9 +177,20 @@ def build(context):
         actions.append(ExecuteProcess(
             cmd=['MicroXRCEAgent'] + cfg['xrce_args'].split(), name='xrce_agent', output='screen'))
 
-    cam = intrinsics(context) if is_on(context, 'ego') else {}
+    ego_on = is_on(context, 'ego')
+    cam = intrinsics(context) if ego_on else {}
+    
+    if cam is None:
+        path = os.path.expanduser(cfg['intrinsics_file'])
+        actions.append(LogInfo(msg=f'WARNING: no camera intrinstics ({path} missing, fx/fy/cx/cy not given). '
+                                    'Skipping EGO for this launch. With the ZED running. run '    
+                                    'bash uav-explorer/jetson-runner/05_capture_intrinsics.sh, then relaunch.'))
+        ego_on = False
+        cam = {}
 
-    if is_on(context, 'ego'):
+    if ego_on:
+        actions.append(LogInfo(msg=f"EGO intrinsics from {cam['source']}: "
+        f"fx={cam['fx']} fy={cam['fy']} cx={cam['cx']} cy={cam['cy']}"))
         if share('ego_planner') is None:
             raise RuntimeError('ego_planner is not installed: source ~/ego_ws/install/setup.bash')
         os.environ['EGO_INFLATION'] = str(number(context, 'inflation'))

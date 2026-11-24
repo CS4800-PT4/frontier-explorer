@@ -160,6 +160,13 @@ if ! timeout 20 ros2 topic echo /mavros/local_position/odom --once >/dev/null 2>
 fi
 echo "[demo] odom OK"
 
+echo "[demo] checking if mode_key connection is working "
+if ! timeout 20 bash -c 'until ros2 topic info /mode_key 2>/dev/null | grep -Eq "Subscription count: [1-9]"; do sleep 1; done'; then
+  echo "[demo] FAIL: nothing subscribed to /mode_key after 20 s (bridge not running, or different ROS_DOMAIN_ID). Check the 04_run_stack.sh terminal."
+  exit 1
+fi
+echo "[demo] mode_key OK (bridge subscribed)" 
+
 confirm "STEP 1 TAKEOFF (send t): ARMS, props spin, climbs and hovers. Area clear? Kill switch in hand?"
 pub_key t 8
 FLYING=1
