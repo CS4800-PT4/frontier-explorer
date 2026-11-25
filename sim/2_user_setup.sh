@@ -36,7 +36,7 @@ mkdir -p ~/mavros_ws/src
 clone --depth 1 --branch 2.15.1 https://github.com/mavlink/mavros.git ~/mavros_ws/src/mavros
 # mavros_msgs comes from apt (2.15.1); skip tests/examples
 touch ~/mavros_ws/src/mavros/{mavros_msgs,test_mavros,mavros_examples}/COLCON_IGNORE
-( cd ~/mavros_ws && MAKEFLAGS=-j6 colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF )
+( cd ~/mavros_ws && MAKEFLAGS=${MAKEFLAGS:--j6} colcon build --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF )
 
 # --- Sim repo (patched: ego world default, optional headless Gazebo, world/spawn selection) ---
 clone https://github.com/DongnanHu6556/ego-planner-ros2-sim.git ~/ego-planner-ros2-sim
